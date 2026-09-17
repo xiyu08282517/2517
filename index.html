@@ -255,20 +255,25 @@ td.addr .cpv>span:first-child{white-space:normal;word-break:break-all}
 .empty{color:var(--tx3)}
 .unk{display:inline-block;color:#9aa3ae;background:#f2f3f5;border:1px dashed #d9dde2;border-radius:5px;padding:0.5px 7px;font-size:11.5px;font-style:normal}
 /* 单元格操作
-   双击任何格子 = 复制（可编辑列复制该格；其他列复制整行）
-   悬停可编辑格 = 弹出「✎ 修改内容」小标签，点它才进编辑态 */
+   双击任何格子 = 复制（可复制列复制该格；其他列复制整行）
+   悬停可编辑格 = 弹出「✎ 修改 / ＋ 填写」小标签，点它才进编辑态 */
 .fillwrap{position:relative;display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}
 .fillwrap[data-edit]{cursor:pointer}
-/* 悬停标签：贴在格子右侧，不占布局 */
-.edittip{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:5px;z-index:30;
-  display:inline-flex;align-items:center;font-size:11px;line-height:1;padding:3px 8px;border-radius:5px;
-  background:#fff7ed;border:1px solid #f3d3a8;color:#b06a12;font-weight:700;cursor:pointer;
-  white-space:nowrap;box-shadow:0 1px 4px rgba(20,30,50,.13);transition:background .12s}
-.edittip:hover{background:#ffedd5;border-color:#e89a3c;color:#8a4f06}
-/* 最后一列标签向左弹，避免溢出 */
-td:last-child .edittip{left:auto;right:100%;margin-left:0;margin-right:5px}
+/* 悬停标签：贴格子左缘弹出（见 JS 注释：右缘会被下一列遮挡）
+   防误触三件套：
+     ① pointer-events:none —— 标签默认不接收鼠标，鼠标滑过不会误点
+     ② 标签只盖住格子左侧一小块，不侵占相邻列的可点区域
+     ③ 悬停时必须鼠标停在标签上才恢复可点（此时是有意点击，不是误触） */
+.edittip{position:absolute;top:50%;left:-2px;transform:translateY(-50%);z-index:260;
+  display:inline-flex;align-items:center;font-size:11px;line-height:1;padding:4px 8px;border-radius:6px;
+  background:#fff;border:1.5px solid var(--brand);color:var(--brand);font-weight:700;
+  white-space:nowrap;box-shadow:0 3px 12px rgba(20,30,50,.22);cursor:pointer;pointer-events:none;
+  transition:background .12s,color .12s}
+.edittip:hover{background:var(--brand);color:#fff}
 /* 编辑中的格子高亮 */
 .fillwrap.tipon{background:#eef3fe;border-radius:6px;box-shadow:0 0 0 2px #eef3fe}
+.fillwrap.tipon .edittip{pointer-events:auto;animation:tipin .16s ease-out}
+@keyframes tipin{from{opacity:.4}to{opacity:1}}
 /* 就地编辑输入框 */
 .fillinp{width:100%;min-width:92px;box-sizing:border-box;font:inherit;font-size:12px;padding:3px 7px;border:1px solid #5b8def;border-radius:5px;outline:none;background:#fff;color:inherit;box-shadow:0 0 0 3px rgba(91,141,239,.14)}
 .fillinp.numinp{min-width:72px;text-align:right}
@@ -281,6 +286,24 @@ td:last-child .edittip{left:auto;right:100%;margin-left:0;margin-right:5px}
 .tag.lv.none{background:#f2f3f5;color:var(--tx3);font-weight:400}
 .tag.track{background:var(--purplebg);color:var(--purple);font-weight:600}
 .tag.cate{background:#e7f6f0;color:#0d7a5c;font-weight:600}
+.tag.coop{background:#fdeee6;color:#c2410c;font-weight:700}
+/* 达人标记：昵称后的彩色小标 */
+.nickmark{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;
+  margin-left:5px;vertical-align:middle;white-space:nowrap;letter-spacing:.2px}
+.nickmark.budget{background:linear-gradient(135deg,#fff3c4,#ffe08a);color:#8a6100;border:1px solid #f0cf75}
+.nickmark.fee{background:linear-gradient(135deg,#ffe6d0,#ffd0ab);color:#a04a09;border:1px solid #f2b98a}
+/* 标记选择器 */
+.marklist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.markopt{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1.5px solid var(--line);
+  border-radius:10px;cursor:pointer;transition:.13s;background:#fff}
+.markopt:hover{border-color:#c3ccd6;background:#fafbfc}
+.markopt.on{border-color:var(--brand);background:var(--brandbg)}
+.markopt.dis{opacity:.45;cursor:not-allowed}
+.markopt input{width:16px;height:16px;flex-shrink:0;accent-color:var(--brand);cursor:pointer}
+.markopt.dis input{cursor:not-allowed}
+.markopt .mkbody{display:flex;flex-direction:column;gap:3px;min-width:0}
+.markopt .mkbody b{font-size:13.5px;font-weight:600;color:var(--tx);display:flex;align-items:center}
+.markopt .mkbody i{font-style:normal;font-size:11.5px;color:var(--tx3)}
 
 /* ---------- 异常标 / 团标识 ---------- */
 td.cent{text-align:center;white-space:nowrap}
@@ -290,6 +313,8 @@ td.cent{text-align:center;white-space:nowrap}
 .abn-add{display:inline-block;color:#c3cad2;font-size:11.5px;cursor:pointer;border:1px dashed #d9dde2;
      border-radius:6px;padding:2px 8px;white-space:nowrap;transition:.13s}
 .abn-add:hover{color:#c62828;border-color:#f0b8b8;background:#fef6f6}
+/* 加标记按钮：悬停金色，与异常按钮的红色区分开 */
+.abn-add.markadd:hover{color:#8a6100;border-color:#f0cf75;background:#fffbeb}
 .team{display:inline-block;background:#eef4ff;color:#2f6fed;border:1px solid #d6e4ff;border-radius:6px;
      padding:2px 8px;font-size:11px;font-weight:600;cursor:help;white-space:nowrap}
 tr.row-abn{background:#fff6f6}
@@ -400,6 +425,21 @@ tr.mark-row:hover{background:#fff5f0}
       </div>
       <div class="fdiv"></div>
       <div class="fgroup">
+        <label>合作类型</label>
+        <div class="msel" id="msCoop">
+          <button type="button" class="mselbtn" data-msel-btn><span class="mseltxt">全部合作类型</span><i class="mselar">▾</i></button>
+          <div class="mselpop" data-msel-pop>
+            <div class="mselhead">
+              <input type="text" class="mselsearch" data-msel-search placeholder="搜索合作类型…">
+              <button type="button" class="mselall" data-msel-all>全选</button>
+              <button type="button" class="mselnone" data-msel-none>清空</button>
+            </div>
+            <div class="msellist" data-msel-list></div>
+          </div>
+        </div>
+      </div>
+      <div class="fdiv"></div>
+      <div class="fgroup">
         <label>达人赛道</label>
         <div class="msel" id="msTrack">
           <button type="button" class="mselbtn" data-msel-btn><span class="mseltxt">全部赛道</span><i class="mselar">▾</i></button>
@@ -468,7 +508,7 @@ tr.mark-row:hover{background:#fff5f0}
     </div>
     <div class="meta-line">
       <span id="hint">输入关键词或筛选条件开始查询</span>
-      <span>💡 点击任意信息即可复制 · 双击整行复制该达人全部信息</span>
+      <span>💡 双击任意信息即可复制 · 鼠标悬停可修改／补充</span>
     </div>
   </div>
 
@@ -535,6 +575,27 @@ tr.mark-row:hover{background:#fff5f0}
 
 <input type="file" id="impFile" accept=".xlsx,.xls,.csv" style="display:none">
 
+<!-- 达人标记选择器：3 选 1 -->
+<div class="modal" id="markModal">
+  <div class="mbox">
+    <div class="mhead">
+      <b>设置达人标记</b>
+      <button class="mclose" id="markClose">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="mnote">给「<b id="markWho"></b>」加一个标记。标记会显示在昵称后面，所有打开本页的人都能看到。<br>
+        <span style="color:var(--tx3)">标记只能新增、不能撤销；再次点击不会重复写入。</span></div>
+      <div id="markBody" class="marklist"></div>
+    </div>
+    <div class="mfoot">
+      <span class="mtip" id="markTip"></span>
+      <span style="flex:1"></span>
+      <button class="btn" id="markCancel">取消</button>
+      <button class="btn primary" id="markOk">确认标记</button>
+    </div>
+  </div>
+</div>
+
 <script src="data/meta.js"></script>
 <script src="data/config.js"></script>
 <script src="data/part00.js"></script>
@@ -557,21 +618,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 <script>
 (function () {
   'use strict';
-  const IDX = {plat:0,nick:1,handle:2,uid:3,fans:4,type:5,level:6,sales:7,wx1:8,wx2:9,wx3:10,recv:11,phone:12,addr:13,track:14,cate:15,abn:16,team:17};
+  const IDX = {plat:0,nick:1,handle:2,uid:3,fans:4,type:5,level:6,sales:7,wx1:8,wx2:9,wx3:10,recv:11,phone:12,addr:13,track:14,cate:15,coop:16,mark:17,abn:18,team:19};
   // 显示顺序（表头 / 表体 / 导出共用）：数据索引按这个数组重排
   // 注意：只改「显示顺序」，data/*.js 里的物理列索引一律不动
   const COLS = [
     IDX.plat, IDX.nick, IDX.handle, IDX.uid, IDX.fans,
-    IDX.type, IDX.track, IDX.cate, IDX.level, IDX.sales,   // 赛道 / 分类 插在类型与等级之间
+    IDX.type, IDX.coop, IDX.track, IDX.cate, IDX.level, IDX.sales,  // 合作类型/赛道/分类 插在类型与等级之间
     IDX.wx1, IDX.wx2, IDX.wx3, IDX.recv, IDX.phone, IDX.addr,
-    IDX.abn, IDX.team
+    IDX.mark, IDX.abn, IDX.team
   ];
-  const HEADER = ['平台','达人昵称','达人号','达人UID','粉丝数','带货类型','达人赛道','带货分类','带货等级','近30日销量','达人微信号','达人微信号2','达人微信号3','收货人','收货人手机号','收货人地址','异常','团标识'];
-  // 显示列号（0..17） → 数据列号
+  const HEADER = ['平台','达人昵称','达人号','达人UID','粉丝数','带货类型','合作类型','达人赛道','带货分类','带货等级','近30日销量','达人微信号','达人微信号2','达人微信号3','收货人','收货人手机号','收货人地址','达人标记','异常','团标识'];
+  // 显示列号（0..19） → 数据列号
   const V2D = COLS;
   // 数据列号 → 显示列号
   const D2V = (()=>{ const m={}; COLS.forEach((d,v)=>m[d]=v); return m; })();
-  const NCOL = HEADER.length;   // 18
+  const NCOL = HEADER.length;   // 20
   const PER = 50;
   const CAND_MAX = 150;   // 相似候选池上限，防止卡顿
 
@@ -591,14 +652,33 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     '食品饮料','美妆个护','母婴用品','家居日用','服饰鞋包',
     '生鲜果蔬','保健养生','数码家电','图书教育','其他'
   ];
+  // ③ 带货类型 —— 平台给的固定枚举
+  const CTYPES = ['直播为主','视频为主','视直一体','橱窗','种草'];
   // 异常标记（单一开关，用户决定）
   const ABNORMAL = '异常';
 
-  // 扩展列索引（在原有 14 列之后追加）
-  const EX = { track:14, cate:15, abn:16, team:17 };
+  // ③ 合作类型 —— 人工维护，与达人绑定（不是内容分类，是 BD 动作分类）
+  const COOPS = ['纯佣','投流'];
+  // ④ 达人标记 —— 贴在昵称后的彩色标记，3 选 1（空 = 无标记）
+  //    只能设置、不能清除（与异常标一致，云端触发器保护）
+  const MARKS = ['预算达人','稿费达人'];
+  const MARK_CN = { '预算达人':'预算达人', '稿费达人':'稿费达人' };
+
+  // 扩展列索引：14~17 为云端增量列，18/19 为前端派生列
+  const EX = { track:14, cate:15, coop:16, mark:17, abn:18, team:19 };
+  // 索引生成时 data/*.js 只有 14 列 → 补齐到 20 列
+  const N_DATA_COL = 20;
 
   const ALL = [];
-  (window.__CHUNKS__ || []).forEach(rows => { if (rows) rows.forEach(r => ALL.push(r)); });
+  // 关键：data/*.js 每条只有 14 列。新增列（track/cate/coop/abn/team）一律补空串占位，
+  // 否则任何 r[NEW] 写入都会在稀疏数组上撑大 length，导致后续遍历/导出错位。
+  (window.__CHUNKS__ || []).forEach(rows => {
+    if (!rows) return;
+    rows.forEach(r => {
+      while (r.length < N_DATA_COL) r.push('');
+      ALL.push(r);
+    });
+  });
 
   // ---------- 团标识自动统计 ----------
   // 规则：同一「收货人」或「手机号」被 ≥3 个不同达人共用 → 可能是内部团/外部团联系方式
@@ -654,11 +734,13 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
   const state = {q:'', plat:new Set(), type:new Set(), level:'', fmin:'', fmax:'', onlyWx:false,
                  salesUnk:false, wxUnk:false, fansUnk:false, hideUnk:false,
-                 track:new Set(), cate:new Set(), onlyAbn:false, onlyTeam:false,
+                 track:new Set(), cate:new Set(), coop:new Set(), mark:new Set(),
+                 onlyAbn:false, onlyTeam:false,
                  page:1, sortKey:-1, sortDir:-1, result:ALL, sim:false, simInfo:null, markSet:null,
                  scored:false, scoreMap:null, exactN:0, dupGroups:null, terms:[]};
 
   const UNK = '未知';
+  const NOMARK = '无标记';   // 达人标记筛选项里的「空值」显示名
 
   // ---------- helpers ----------
   const $ = s => document.querySelector(s);
@@ -672,13 +754,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
   // ---------- 数据列索引 → 云端字段名（可编辑列映射） ----------
   //  禁止修改：达人昵称(1)、达人UID(3)
-  //  走专用逻辑：异常标记(16) —— 数据库触发器规定「只能加不能删」，用「+ 标记」按钮
-  //  前端派生：团标识(17) —— 不入库
+  //  走专用按钮：异常标记(18)、达人标记(17) —— 数据库触发器规定「只能加不能删」，
+  //             不放进 COL2FIELD，否则悬停会弹出一个必然失败的编辑框
+  //  前端派生：团标识(19) —— 不入库
   //  注意：带货类型 → ctype、带货等级 → clevel（云端真实列名，不是 type/level）
+  //  注意：合作类型 → coop（需先在 CloudBase 给 creators 表加 coop text 列）
   const COL2FIELD = {
     0:'platform', 2:'handle', 4:'fans', 5:'ctype', 6:'clevel', 7:'sales',
     8:'wx1', 9:'wx2', 10:'wx3', 11:'receiver', 12:'phone', 13:'address',
-    14:'track', 15:'cate'
+    14:'track', 15:'cate', 16:'coop'
   };
   // 数值型字段（提交时转 Number）
   const NUM_FIELDS = {fans:1, sales:1};
@@ -687,8 +771,12 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     platform:'平台', handle:'达人号', fans:'粉丝数', ctype:'带货类型', clevel:'带货等级',
     sales:'近30日销量', wx1:'微信号', wx2:'微信号2', wx3:'微信号3',
     receiver:'收货人', phone:'收货人手机号', address:'收货地址',
-    track:'达人赛道', cate:'带货分类', abnormal:'异常标记'
+    track:'达人赛道', cate:'带货分类', coop:'合作类型', mark:'达人标记', abnormal:'异常标记'
   };
+  // 枚举型字段：编辑器渲染成下拉框而非自由输入（值域固定，避免手打出脏数据）
+  //   键 → 选项数组；选项内容见 CTYPES / COOPS / TRACKS / CATES
+  const SELECT_FIELDS = { ctype:'CTYPES', coop:'COOPS', track:'TRACKS', cate:'CATES' };
+  const SELECT_OPTS   = { CTYPES:CTYPES, COOPS:COOPS, TRACKS:TRACKS, CATES:CATES };
 
   // ---------- 关键词权重排序 ----------
   // 权重表：越"唯一"的字段权重越高。命中位置越靠前、字段越精确 → 分越高
@@ -948,8 +1036,19 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       c.dataset.plat=k; fPlat.appendChild(c);
     });
     const fType=$('#fType');
-    Object.entries(types).sort(sorter).forEach(([k,v])=>{
-      const c=el('button','chip'+(k===UNK?' unkchip':''), esc(k)+' <span style="opacity:.55">'+v+'</span>');
+    // 带货类型：固定枚举恒常可见（与赛道/分类同理），枚举外的历史值按数量补在后面
+    CTYPES.forEach(k=>{ if(!(k in types)) types[k]=0; });
+    const tKeys = Object.keys(types).filter(k=>k!==UNK);
+    tKeys.sort((a,b)=>{
+      const ia=CTYPES.indexOf(a), ib=CTYPES.indexOf(b);
+      if(ia>=0&&ib>=0) return ia-ib;
+      if(ia>=0) return -1;
+      if(ib>=0) return 1;
+      return (types[b]||0)-(types[a]||0);
+    });
+    if (types[UNK]) tKeys.push(UNK);
+    tKeys.forEach(k=>{
+      const c=el('button','chip'+(k===UNK?' unkchip':''), esc(k)+' <span style="opacity:.55">'+types[k]+'</span>');
       c.dataset.type=k; fType.appendChild(c);
     });
     const fLevel=$('#fLevel');
@@ -957,14 +1056,22 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       const o=el('option',null,esc(k)); o.value=k; fLevel.appendChild(o);
     });
 
-    // 赛道 / 分类 → 多选下拉框
-    const cntT={}, cntC={};
+    // 赛道 / 分类 / 合作类型 → 多选下拉框
+    //  重要：选项来源是「枚举定义 + 数据里出现过的值」，不是只取数据里出现过的。
+    //  本地 5 万条这些列全是空的（属云端增量列），若只统计数据，
+    //  用户会发现「纯佣 / 投流」一个都选不到 —— 枚举项必须恒常可见。
+    const cntT={}, cntC={}, cntP={};
     ALL.forEach(r=>{
-      const t=isUnk(r[14])?UNK:r[14], c=isUnk(r[15])?UNK:r[15];
-      cntT[t]=(cntT[t]||0)+1; cntC[c]=(cntC[c]||0)+1;
+      const t=isUnk(r[14])?UNK:r[14], c=isUnk(r[15])?UNK:r[15], p=isUnk(r[16])?UNK:r[16];
+      cntT[t]=(cntT[t]||0)+1; cntC[c]=(cntC[c]||0)+1; cntP[p]=(cntP[p]||0)+1;
     });
+    // 枚举项补 0 计数，保证一定渲染出来
+    TRACKS.forEach(k=>{ if(!(k in cntT)) cntT[k]=0; });
+    CATES .forEach(k=>{ if(!(k in cntC)) cntC[k]=0; });
+    COOPS .forEach(k=>{ if(!(k in cntP)) cntP[k]=0; });
     buildMsel($('#msTrack'), TRACKS.concat([UNK]), cntT, 'track', '全部赛道');
     buildMsel($('#msCate'),  CATES.concat([UNK]),  cntC, 'cate',  '全部分类');
+    buildMsel($('#msCoop'),  COOPS.concat([UNK]),  cntP, 'coop',  '全部合作类型');
   }
 
   // ---------- 多选下拉：填充选项 + 交互 ----------
@@ -1023,14 +1130,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     btn.title = set.size ? Array.from(set).join('、') : placeholder;
   }
 
+  // 多选下拉注册表：#id → { stateKey, placeholder }
+  //   新增筛选下拉只需在这里加一行，不必再动 initMsel / 重置逻辑
+  const MSELS = [
+    ['#msCoop',  'coop',  '全部合作类型'],
+    ['#msTrack', 'track', '全部赛道'],
+    ['#msCate',  'cate',  '全部分类']
+  ];
+
   // 多选下拉的全局交互（开合 / 搜索 / 全选 / 清空）
   (function initMsel(){
-    const roots = ['#msTrack','#msCate'].map(s=>document.querySelector(s)).filter(Boolean);
-    const closeAll = except => roots.forEach(r=>{ if (r!==except) r.classList.remove('open'); });
+    const items = MSELS.map(([sel,k,ph])=>({root:document.querySelector(sel), key:k, ph:ph}))
+                       .filter(it=>it.root);
+    const closeAll = except => items.forEach(it=>{ if (it.root!==except) it.root.classList.remove('open'); });
 
-    roots.forEach(root=>{
-      const key = root.id === 'msTrack' ? 'track' : 'cate';
-      const ph  = root.id === 'msTrack' ? '全部赛道' : '全部分类';
+    items.forEach(({root, key, ph})=>{
       const btn = root.querySelector('[data-msel-btn]');
       const pop = root.querySelector('[data-msel-pop]');
       const sea = root.querySelector('[data-msel-search]');
@@ -1119,13 +1233,23 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       const ct = isUnk(r[15]) ? UNK : r[15];
       if (!state.cate.has(ct)) return false;
     }
+    // 合作类型（含「未知」）
+    if (state.coop.size){
+      const cp = isUnk(r[16]) ? UNK : r[16];
+      if (!state.coop.has(cp)) return false;
+    }
+    // 达人标记（含「无标记」）
+    if (state.mark.size){
+      const mk = isUnk(r[17]) ? NOMARK : r[17];
+      if (!state.mark.has(mk)) return false;
+    }
     // 只看异常达人
-    if (state.onlyAbn && r[16] !== ABNORMAL) return false;
+    if (state.onlyAbn && r[18] !== ABNORMAL) return false;
     // 只看团标识
     if (state.onlyTeam && !isTeam(r)) return false;
-    // 隐藏「未知」行：只看用户关心的字段（平台/类型/等级/销量/微信）
+    // 隐藏「未知」行：只看用户关心的字段（平台/类型/合作类型/等级/销量/微信）
     if (state.hideUnk){
-      if (isUnk(r[0]) || isUnk(r[5]) || isUnk(r[6]) || isUnk(r[7]) || !hasWx(r)) return false;
+      if (isUnk(r[0]) || isUnk(r[5]) || isUnk(r[16]) || isUnk(r[6]) || isUnk(r[7]) || !hasWx(r)) return false;
     }
     // 注：UID / 粉丝数 不参与，否则几乎全被剔除
     const fans = Number(r[4])||0;
@@ -1219,7 +1343,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   function renderWarn(){
     const box=$('#warnPanel'); box.innerHTML='';
     const res=state.result;
-    const abns=res.filter(r=>r[16]===ABNORMAL);
+    const abns=res.filter(r=>r[18]===ABNORMAL);
     if (!abns.length) return;
     const card=el('div','warnbar');
     const cp = v => '<span class="cpv" data-copy="'+esc(v)+'" title="点击复制：'+esc(v)+'">'+esc(v)+'<span class="cp">⧉</span></span>';
@@ -1341,6 +1465,23 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     return '<span class="team" title="'+tip+'">👥 '+label+'</span>';
   }
 
+  // ---------- 达人标记（预算达人 / 稿费达人） ----------
+  //  规则（用户定）：3 选 1 —— 无标记（原样）/ 预算达人（金色）/ 稿费达人（橙色）
+  //  只能设置、不能清除，与异常标同样受云端触发器保护 → 不走通用编辑，用专用按钮
+  const markCls = m => m === '预算达人' ? 'budget' : m === '稿费达人' ? 'fee' : '';
+  // 昵称后的小标记
+  function markTag(r){
+    const m = isUnk(r[17]) ? '' : String(r[17]).trim();
+    if (!m) return '';
+    return '<span class="nickmark '+markCls(m)+'" title="达人标记：'+esc(m)+'">'+esc(m)+'</span>';
+  }
+  // 标记列单元格：已标记 → 显示标记；未标记 → 「+ 标记」按钮（弹 3 选 1）
+  function markCell(r){
+    const m = isUnk(r[17]) ? '' : String(r[17]).trim();
+    if (m) return '<span class="nickmark '+markCls(m)+'">'+esc(m)+'</span>';
+    return '<span class="abn-add markadd" data-mark="0" title="给这位达人加标记">+ 标记</span>';
+  }
+
   // ---------- render table ----------
   function render(){
     const res=state.result, total=res.length;
@@ -1385,28 +1526,31 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     } else {
       const frag=document.createDocumentFragment();
       slice.forEach((r,i)=>{
-        const isAbn = r[16] === ABNORMAL;
+        const isAbn = r[17] === ABNORMAL;
         const cls = (isAbn ? 'row-abn' : '') + ((state.markSet && state.markSet.has(r)) ? ' mark-row' : '');
         const tr=el('tr', cls || null);
         // 可编辑格子外壳：鼠标悬停弹「修改内容」标签，点标签进编辑态
         //   data-edit = 数据列号；不带该属性 = 只读列（达人昵称 / 达人UID）
-        const ew = (idx, inner, extraCls) =>
-          '<span class="fillwrap'+(extraCls?' '+extraCls:'')+'" data-edit="'+idx+'">'+inner+'</span>';
-        // 空值格子
-        const unkCell = (idx, extraCls) => ew(idx, '<span class="unkfill">'+UNK+'</span>', extraCls);
+        //   data-copy = 该格原始值 → 双击命中它即复制本格，不再冒泡到整行
+        const ew = (idx, inner, extraCls, copyVal) =>
+          '<span class="fillwrap'+(extraCls?' '+extraCls:'')+'" data-edit="'+idx+'"'+
+          (copyVal != null ? ' data-copy="'+esc(copyVal)+'"' : '')+'>'+inner+'</span>';
+        // 空值格子：data-copy="" 必须显式写上 —— 否则双击会冒泡到整行复制，
+        // 用户以为复制了空格子，剪贴板里却是整条达人信息。
+        const unkCell = (idx, extraCls) => ew(idx, '<span class="unkfill">'+UNK+'</span>', extraCls, '');
         // 微信号格
         const wxCell = (v, idx) => isUnk(v) ? unkCell(idx)
-                                     : ew(idx, '<span class="wxval" data-copy="'+esc(v)+'">'+esc(v)+'</span>');
+                                     : ew(idx, '<span class="wxval" data-copy="'+esc(v)+'">'+esc(v)+'</span>', null, v);
         // 通用单元格
         const cpCell = (v, extraCls, mono, idx) => {
           if (isUnk(v)) return idx != null ? unkCell(idx, extraCls) : '<span class="unk">'+UNK+'</span>';
           const cls = 'cpv' + (extraCls ? ' '+extraCls : '') + (mono ? ' mono' : '');
-          return ew(idx, '<span class="'+cls+'" data-copy="'+esc(v)+'">'+esc(v)+'</span>', extraCls);
+          return ew(idx, '<span class="'+cls+'" data-copy="'+esc(v)+'">'+esc(v)+'</span>', extraCls, v);
         };
-        // 标签型单元格（平台 / 类型 / 等级 / 赛道 / 分类）
+        // 标签型单元格（平台 / 类型 / 等级 / 赛道 / 分类 / 合作类型）
         const tagCell = (v, idx, tagCls) => isUnk(v)
           ? unkCell(idx)
-          : ew(idx, '<span class="tag'+(tagCls?' '+tagCls:'')+'">'+esc(v)+'</span>');
+          : ew(idx, '<span class="tag'+(tagCls?' '+tagCls:'')+'">'+esc(v)+'</span>', null, v);
         const isBase = simOn && i===0;
         const srcTag = r.__src === 'remote' ? '<span class="tagsrc remote">共建</span>'
                      : r.__src === 'local'  ? '<span class="tagsrc local">本机</span>' : '';
@@ -1414,21 +1558,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         const cellOf = (di) => {
           switch(di){
             case 0:  // 平台
-              return '<td>'+(isUnk(r[0])?'<span class="fillwrap" data-edit="0"><span class="unkfill">'+UNK+'</span></span>':'<span class="fillwrap" data-edit="0"><span class="tag plat">'+esc(r[0])+'</span></span>')+(isBase?' <span class="tag lv" style="background:var(--okbg);color:#0b7a3d">基准</span>':'')+'</td>';
-            case 1:  // 达人昵称（只读：不可修改）
-              return '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="双击复制：'+esc(r[1])+'">'+esc(r[1])+'</span>')+srcTag+'</td>';
-            case 2:  // 达人号
+              return '<td>'+(isUnk(r[0])?'<span class="fillwrap" data-edit="0"><span class="unkfill">'+UNK+'</span></span>':'<span class="fillwrap" data-edit="0" data-copy="'+esc(r[0])+'"><span class="tag plat">'+esc(r[0])+'</span></span>')+(isBase?' <span class="tag lv" style="background:var(--okbg);color:#0b7a3d">基准</span>':'')+'</td>';
+            case 1:  // 达人昵称（只读：不可修改；不可复制单格 → 双击走整行）
+              return '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="双击复制：'+esc(r[1])+'">'+esc(r[1])+'</span>')+markTag(r)+srcTag+'</td>';
+            case 2:  // 达人号（只读：不可修改；双击复制该格）
               return '<td class="uid">'+cpCell(r[2],'uidv',false,2)+'</td>';
-            case 3:  // 达人UID（只读：不可修改）
-              return '<td class="uid">'+cpCell(r[3],'uidv')+'</td>';
+            case 3:  // 达人UID（只读：不可修改；双击复制该格）
+              return '<td class="uid">'+cpCell(r[3],'uidv',false,3)+'</td>';
             case 4:  // 粉丝数
-              return '<td class="num">'+(isUnk(r[4])?unkCell(4):ew(4, fmt(r[4])))+'</td>';
+              return '<td class="num">'+(isUnk(r[4])?unkCell(4):ew(4, fmt(r[4]), null, String(r[4])))+'</td>';
             case 5:  // 带货类型
               return '<td>'+tagCell(r[5], 5)+'</td>';
             case 6:  // 带货等级
-              return '<td>'+(isUnk(r[6])?unkCell(6):ew(6,'<span class="tag lv">'+esc(r[6])+'</span>'))+'</td>';
+              return '<td>'+(isUnk(r[6])?unkCell(6):ew(6,'<span class="tag lv">'+esc(r[6])+'</span>', null, r[6]))+'</td>';
             case 7:  // 近30日销量
-              return '<td class="num">'+(isUnk(r[7])?unkCell(7):ew(7, fmt(r[7])))+'</td>';
+              return '<td class="num">'+(isUnk(r[7])?unkCell(7):ew(7, fmt(r[7]), null, String(r[7])))+'</td>';
             case 8:  return '<td class="wx">'+wxCell(r[8], 8)+'</td>';
             case 9:  return '<td class="wx">'+wxCell(r[9], 9)+'</td>';
             case 10: return '<td class="wx">'+wxCell(r[10], 10)+'</td>';
@@ -1439,11 +1583,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
               return '<td>'+tagCell(r[14], 14, 'track')+'</td>';
             case 15: // 带货分类
               return '<td>'+tagCell(r[15], 15, 'cate')+'</td>';
-            case 16: // 异常标（特殊列：数据库触发器规定「只能加不能删」，故不走通用编辑）
-              return '<td class="cent">'+(r[16]===ABNORMAL
+            case 16: // 合作类型（枚举：纯佣 / 投流）
+              return '<td>'+tagCell(r[16], 16, 'coop')+'</td>';
+            case 17: // 达人标记（昵称后彩色标记；只能设置不能清除 → 专用按钮，不走通用编辑）
+              return '<td class="cent">'+markCell(r)+'</td>';
+            case 18: // 异常标（特殊列：数据库触发器规定「只能加不能删」，故不走通用编辑）
+              return '<td class="cent">'+(r[18]===ABNORMAL
                   ? '<span class="abn" title="该达人已被标记为异常">⚠ 异常</span>'
-                  : '<span class="abn-add" data-abn="0" title="标记为异常达人">+ 标记</span>')+'</td>';
-            case 17: // 团标识
+                  : '<span class="abn-add" data-abn="0" title="标记为异常达人">+ 异常</span>')+'</td>';
+            case 19: // 团标识
               return '<td class="cent teamtd">'+teamCell(r)+'</td>';
           }
           return '<td></td>';
@@ -1456,14 +1604,19 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
           '平台：'+(r[0]||''),
           (r[2]?'达人号：'+r[2]:''),
           (r[3]?'UID：'+r[3]:''),
+          (isUnk(r[4])?'':'粉丝：'+fmt(r[4])),
+          (r[5]?'带货类型：'+r[5]:''),
+          (r[16]?'合作类型：'+r[16]:''),
+          (r[14]?'赛道：'+r[14]:''),
+          (r[15]?'带货分类：'+r[15]:''),
+          (r[6]?'带货等级：'+r[6]:''),
+          (isUnk(r[7])?'':'近30日销量：'+fmt(r[7])),
           (r[8]?'微信号：'+r[8]:''),
           (r[9]?'微信号2：'+r[9]:''),
           (r[10]?'微信号3：'+r[10]:''),
           (r[11]?'收货人：'+r[11]:''),
           (r[12]?'手机号：'+r[12]:''),
-          (r[13]?'地址：'+r[13]:''),
-          (isUnk(r[4])?'':'粉丝：'+fmt(r[4])),
-          (r[14]?'赛道：'+r[14]:'')
+          (r[13]?'地址：'+r[13]:'')
         ].filter(Boolean).join('\n');
         frag.appendChild(tr);
       });
@@ -1511,7 +1664,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   $('#clr').onclick=()=>{ $('#q').value=''; state.q=''; $('#clr').classList.remove('on'); apply(); };
   $('#reset').onclick=()=>{
     $('#q').value=''; state.q=''; state.plat.clear(); state.type.clear();
-    state.track.clear(); state.cate.clear();
+    state.track.clear(); state.cate.clear(); state.coop.clear();
     state.level=''; state.fmin=''; state.fmax=''; state.onlyWx=false;
     state.salesUnk=false; state.wxUnk=false; state.fansUnk=false; state.hideUnk=false;
     state.onlyAbn=false; state.onlyTeam=false;
@@ -1519,7 +1672,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     $('#fLevel').value=''; $('#fFansMin').value=''; $('#fFansMax').value='';
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
     // 同步多选下拉：清空勾选 + 按钮文字复位
-    [['#msTrack','track','全部赛道'],['#msCate','cate','全部分类']].forEach(([sel,k,ph])=>{
+    MSELS.forEach(([sel,k,ph])=>{
       const root=document.querySelector(sel); if(!root) return;
       root.querySelectorAll('.mselopt').forEach(row=>{
         row.querySelector('input').checked=false; row.classList.remove('checked');
@@ -1596,33 +1749,47 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   }
 
   // ---------------- 单元格交互 ----------------
-  //  双击任何格子 = 复制；可编辑列复制该格，其余列复制整行
+  //  双击任何格子 = 复制；可复制列复制该格，其余列（昵称/UID/异常/团标识）复制整行
 
-  // 双击：可编辑格 → 复制该格内容；其他位置 → 复制整行
+  // 双击：可复制格 → 复制该格内容；其他位置 → 复制整行
   document.addEventListener('dblclick', async e=>{
     if (e.target.closest('button,a,select,input')) return;
+    // 防误触：编辑态下的双击一律忽略（输入框内的双击是选词，不是复制）
+    if (filling) return;
 
-    // ① 可编辑格 → 只复制这一格
-    const w = e.target.closest('.fillwrap[data-edit]');
+    // ① 可复制格 → 只复制这一格
+    //    data-copy 是权威来源（渲染时就写好了原始值），
+    //    不从 r[di] 反查 —— 粉丝/销量那两格显示的是格式化值，反查会绕晕。
+    const w = e.target.closest('.fillwrap[data-copy]');
     if (w){
-      const idx = Number(w.dataset.edit);
-      const tr = w.closest('tr');
-      const rowIdx = tr ? Array.from(tr.parentNode.children).indexOf(tr) : -1;
-      const r = rowIdx >= 0 ? state.result[(state.page-1)*PER + rowIdx] : null;
-      if (r){
-        const v = isUnk(r[idx]) ? '' : String(r[idx]).trim();
-        if (!v){ toast('这一格是空的，鼠标停一下即可填写'); return; }
-        const ok = await copyText(v);
+      const val = String(w.getAttribute('data-copy') || '').trim();
+      if (!val){
+        toast('这一格是空的，鼠标停一下即可填写');
         flashCopied(w);
-        if (ok){
-          const short = v.length > 26 ? v.slice(0,26)+'…' : v;
-          toast('已复制：'+short);
-        } else toast('复制失败，请长按/右键选择复制', 'err');
+        return;
+      }
+      const ok = await copyText(val);
+      flashCopied(w);
+      if (ok){
+        const short = val.length > 26 ? val.slice(0,26)+'…' : val;
+        toast('已复制：'+short);
+      } else toast('复制失败，请长按/右键选择复制', 'err');
+      return;
+    }
+
+    // ② 昵称 → 复制昵称本人
+    const nk = e.target.closest('.nickv[data-copy]');
+    if (nk){
+      const nv = String(nk.dataset.copy||'').trim();
+      if (nv){
+        const ok = await copyText(nv);
+        flashCopied(nk);
+        if (ok) toast('已复制：'+(nv.length>26?nv.slice(0,26)+'…':nv));
         return;
       }
     }
 
-    // ② 其他位置（昵称 / UID / 团标识等）→ 复制整行
+    // ③ 其他位置（UID / 异常 / 团标识）→ 复制整行
     const tr2 = e.target.closest('tr[data-rowcopy]');
     if (!tr2) return;
     const rv = tr2.dataset.rowcopy;
@@ -1666,24 +1833,46 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   let filling   = false;   // 是否处于编辑态
   let hoverT    = null;    // 悬停弹出标签的延迟
   let toolWrap  = null;    // 当前显示提示标签的格子
+  let toolMoved = null;    // 标签弹出期间被临时收走的 data-copy（防误触）
   let curSession = null;   // 当前编辑会话
 
-  // 创建/移动「修改内容」标签
+  // 创建「修改内容」标签
+  //  位置：贴在格子左缘（见 CSS 注释：右缘会被下一列盖住 = 用户反馈的「遮挡」）
   function showTool(wrap){
-    if (filling) return;
+    if (filling || !wrap) return;   // 编辑态由 mouseover 先 restore 再进来
     hideTool();
-    const tip = el('span','edittip','✎ 修改内容');
+    // 防误触 A：标签弹出期间把「本格 + 格内所有后代」的 data-copy 全部收走。
+    //  必须用 querySelectorAll('*') 把 wrap 自己也算进来 —— 只查后代的话，
+    //  wrap 自身的 data-copy 还在，而标签恰恰覆盖在 wrap 的区域上，
+    //  用户点标签时事件目标落到 wrap → 触发复制（这就是用户反馈的误触）。
+    //  用 getAttribute/setAttribute 原样存取：dataset 会把空串读成 undefined，
+    //  还原时会写出字面量 "undefined"。
+    toolMoved = [];
+    [wrap].concat([...wrap.querySelectorAll('*')]).forEach(node=>{
+      const raw = node.getAttribute && node.getAttribute('data-copy');
+      if (raw == null) return;
+      toolMoved.push([node, raw]);
+      node.removeAttribute('data-copy');
+    });
+    // 已有内容的格子用「✎ 修改」，空白格用「＋ 填写」——一眼区分动作，防误改
+    const isBlank = !!wrap.querySelector('.unkfill');
+    const tip = el('span','edittip', isBlank ? '＋ 填写' : '✎ 修改');
     wrap.appendChild(tip);
     wrap.classList.add('tipon');
     toolWrap = wrap;
     tip.addEventListener('click', ev=>{
       ev.preventDefault(); ev.stopPropagation();
-      hideTool();
       beginEdit(wrap);
     });
+    // 标签自身的 mousedown 不该被 mouseout 逻辑当成"离开格子"处理
     tip.addEventListener('mousedown', ev=>{ ev.preventDefault(); ev.stopPropagation(); });
   }
   function hideTool(){
+    // 还原被收走的 data-copy
+    if (toolMoved){
+      toolMoved.forEach(([node,val])=>{ if (node && node.isConnected) node.setAttribute('data-copy', val); });
+      toolMoved = null;
+    }
     if (toolWrap){
       toolWrap.classList.remove('tipon');
       const t = toolWrap.querySelector('.edittip');
@@ -1708,32 +1897,55 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if (!r) return;
 
     const isNum  = !!NUM_FIELDS[field];
+    const opts   = SELECT_FIELDS[field] ? SELECT_OPTS[SELECT_FIELDS[field]] : null;
     const curVal = isUnk(r[idx]) ? '' : String(r[idx]).trim();
     const isEdit = !!curVal;
     const label  = FIELD_CN[field] || '内容';
 
     filling = true;
-    hideTool();
+    // 关键顺序：先抓 oldHTML 和 keepCopy（此时 data-copy 还在），再 hideTool。
+    // 反过来会把「已被收走 data-copy」的残缺 HTML 存进 oldHTML，
+    // restore 后这一格就永久失去复制能力。
     const oldHTML = wrap.innerHTML;
     const w = wrap;
+    const keepCopy = w.getAttribute('data-copy');   // 可能是 ''（空白格），用 null 判断有无
+    hideTool();
 
-    // 原地替换成输入框
-    w.innerHTML = '<input class="fillinp'+(isNum?' numinp':'')+'" type="'+(isNum?'number':'text')+
-                  '" value="'+esc(curVal)+'" placeholder="输入'+esc(label)+'，回车提交" />';
+    // 原地替换成输入控件：枚举字段给下拉框，其余给文本/数字框
+    if (opts){
+      w.innerHTML = '<select class="fillinp fillsel">'+
+        '<option value="">— 未选择 —</option>'+
+        opts.map(o=>'<option value="'+esc(o)+'"'+(o===curVal?' selected':'')+'>'+esc(o)+'</option>').join('')+
+        '<option value="__clear__">— 清除（置为未知） —</option>'+
+      '</select>';
+    } else {
+      w.innerHTML = '<input class="fillinp'+(isNum?' numinp':'')+'" type="'+(isNum?'number':'text')+
+                    '" value="'+esc(curVal)+'" placeholder="输入'+esc(label)+'，回车提交" />';
+    }
     const inp = w.querySelector('.fillinp');
-    inp.focus(); inp.select();
+    const isSel = inp.tagName === 'SELECT';
+    inp.focus(); if (!isSel) inp.select();
 
     const restore = () => {
       if (!filling) return;
       filling = false;
       clearTimeout(hoverT);
-      if (w.isConnected) w.innerHTML = oldHTML;
+      if (w.isConnected){
+        w.innerHTML = oldHTML;
+        // 兜底：确保 wrap 自身仍有 data-copy（编辑期间被收走过）
+        if (keepCopy != null) w.setAttribute('data-copy', keepCopy);
+      }
+      hideTool();
       curSession = null;
     };
 
     const doSubmit = async () => {
       let val = String(inp.value || '').trim();
-      if (!val){ toast('没有填写内容'); restore(); return; }
+      if (val === '__clear__') val = '';
+      if (!val){
+        if (isEdit){ toast('没有填写内容'); restore(); return; }
+        restore(); return;
+      }
       if (val === curVal){ restore(); return; }
 
       // 数值型字段校验
@@ -1812,16 +2024,28 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (ev.key === 'Enter'){ ev.preventDefault(); doSubmit(); }
       else if (ev.key === 'Escape'){ ev.preventDefault(); restore(); }
     });
+    // 下拉框：选完即提交（无需回车）；Esc 仍可取消
+    if (isSel) inp.addEventListener('change', ()=>doSubmit());
+    // 失焦还原（点击别处不留下悬空输入框）；提交中/下拉框不还原
+    if (!isSel) inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if (filling && curSession && curSession.wrap===w) restore(); }, 160); });
   }
 
   // 悬停可编辑格子 → 延迟弹出「修改内容」标签
   document.addEventListener('mouseover', e=>{
-    if (filling) return;
     const wrap = e.target.closest('.fillwrap[data-edit]');
     if (!wrap) return;
     if (toolWrap === wrap) return;
     // 在格子内子元素之间移动 → 不重置
     if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+
+    // 已有一个格子处于编辑态、鼠标又移到别的格子上 → 自动收掉旧的编辑框，
+    // 否则用户必须按 Esc 才能改下一格，操作很卡。
+    if (filling){
+      if (curSession){
+        if (curSession.wrap === wrap) return;   // 移回自己，不动
+        curSession.restore();
+      } else return;
+    }
 
     clearTimeout(hoverT);
     hoverT = setTimeout(()=>showTool(wrap), 180);
@@ -1864,11 +2088,118 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
     if (!confirm('把「'+(r[1]||'')+'」标记为异常达人？\n\n标记后所有打开本页的人都会看到红色警告。\n（如需撤销标记，请联系管理员）')) return;
 
-    r[16] = ABNORMAL;
+    r[18] = ABNORMAL;
     await saveAbnormal(r, true);
     toast('已标记为异常达人');
     apply();
   });
+
+  // ---------- 达人标记：3 选 1（无标记 / 预算达人 / 稿费达人） ----------
+  //  只能设置、不能清除。点「+ 标记」→ 弹出选择器 → 确认 → 写云端。
+  document.addEventListener('click', async e=>{
+    const tag = e.target.closest('.markadd[data-mark]');
+    if (!tag) return;
+    if (tag.dataset.mark !== '0') return;      // 已有标记的标签不可点
+
+    const tr = tag.closest('tr');
+    if (!tr) return;
+    const idx = Array.from(tr.parentNode.children).indexOf(tr);
+    const r = state.result[(state.page-1)*PER + idx];
+    if (!r) return;
+
+    // 防刷：与异常标记共用节流窗口
+    const RL_KEY = 'daren_abn_rl_v1';
+    let hist = [];
+    try{ hist = JSON.parse(localStorage.getItem(RL_KEY)||'[]'); }catch(_){ hist = []; }
+    const now = Date.now();
+    hist = hist.filter(t => now - t < 60000);
+    if (hist.length >= 20){ toast('操作过于频繁，请稍后再试'); return; }
+    hist.push(now);
+    try{ localStorage.setItem(RL_KEY, JSON.stringify(hist)); }catch(_){}
+
+    openMarkPick(r);
+  });
+
+  // 标记选择器：3 选 1 弹窗
+  function openMarkPick(r){
+    const cur = isUnk(r[17]) ? '' : String(r[17]).trim();
+    // 选项：无标记 = 原样显示（不加标签）
+    const opts = [{v:'', label:'无标记', desc:'原样显示，昵称后不加任何标签'},
+                  {v:'预算达人', label:'预算达人', desc:'昵称后显示金色「预算达人」标签'},
+                  {v:'稿费达人', label:'稿费达人', desc:'昵称后显示橙色「稿费达人」标签'}];
+    const box = $('#markModal');
+    $('#markWho').textContent = r[1] || r[2] || r[3] || '该达人';
+    const body = $('#markBody');
+    body.innerHTML = opts.map(o=>{
+      const dis = (o.v === '') && cur ? ' disabled' : '';   // 已有标记时不允许改回无标记
+      const on  = (o.v === cur) ? ' on' : '';
+      return '<label class="markopt'+on+(dis?' dis':'')+'">'+
+        '<input type="radio" name="mk" value="'+esc(o.v)+'"'+(o.v===cur?' checked':'')+(dis?' disabled':'')+'>'+
+        '<span class="mkbody">'+
+          '<b>'+(o.v? '<span class="nickmark '+markCls(o.v)+'">'+esc(o.label)+'</span>' : esc(o.label))+'</b>'+
+          '<i>'+esc(o.desc)+(dis?'（已有标记，不可退回）':'')+'</i>'+
+        '</span></label>';
+    }).join('');
+    box.classList.add('on');
+    box._target = r;
+  }
+  function closeMarkPick(){ const b=$('#markModal'); if(b) b.classList.remove('on'); }
+
+  // 确认写入标记
+  async function submitMark(){
+    const box = $('#markModal');
+    const r = box._target;
+    if (!r) return;
+    const sel = box.querySelector('input[name="mk"]:checked');
+    if (!sel) return toast('请选择一个标记');
+    const val = sel.value;
+    const cur = isUnk(r[17]) ? '' : String(r[17]).trim();
+    if (val === cur){ closeMarkPick(); return; }
+    if (!val) return toast('不能退回「无标记」（云端规则：标记只能加不能删）');
+
+    const btn = $('#markOk'); btn.disabled = true;
+    try{
+      if (!isCfgOk()) throw new Error('云端未配置');
+      const patch = { mark: val, editor:'2517' };
+      if (r.__id != null){
+        await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(r.__id), {method:'PATCH', body:patch});
+      } else {
+        const h = String(r[2]||'').trim(), u = String(r[3]||'').trim();
+        if (!h && !u) throw new Error('该行缺少达人号与UID，无法定位');
+        const q = h ? 'handle=eq.'+encodeURIComponent(h) : 'uid=eq.'+encodeURIComponent(u);
+        const found = await cbFetch('/'+CB.table+'?'+q+'&select=id,mark&limit=1');
+        if (Array.isArray(found) && found.length){
+          const rec = found[0];
+          const cloudVal = String(rec.mark==null?'':rec.mark).trim();
+          if (cloudVal){ throw new Error('云端已有标记「'+cloudVal+'」，不可覆盖'); }
+          await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(rec.id), {method:'PATCH', body:patch});
+          r.__id = rec.id;
+        } else {
+          const created = await cbFetch('/'+CB.table, {method:'POST', body:Object.assign({
+            platform: r[0]||null, nickname: r[1]||'', handle: r[2]||null, uid: r[3]||null,
+            editor:'2517', source:'web'
+          }, patch)});
+          if (Array.isArray(created) && created.length) r.__id = created[0].id;
+        }
+      }
+      r[17] = val;
+      r.__src = 'remote';
+      // 本地留痕
+      try{
+        const k = 'daren_mark_v1';
+        const arr = JSON.parse(localStorage.getItem(k)||'[]');
+        arr.push({t:Date.now(), nickname:r[1]||'', handle:r[2]||'', mark:val});
+        localStorage.setItem(k, JSON.stringify(arr));
+      }catch(_){}
+      btn.disabled = false;
+      closeMarkPick();
+      toast('已标记「'+(r[1]||'该达人')+'」为'+val);
+      apply();
+    }catch(err){
+      btn.disabled = false;
+      toast('标记失败：'+err.message, 'err');
+    }
+  }
 
   // 写入异常标（只写不改：仅在云端无标记时补充标记，绝不覆盖已有数据）
   async function saveAbnormal(r){
@@ -2001,17 +2332,19 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       sales: (function(){ const n=Number(r[7]); return isUnk(r[7])?null:(isNaN(n)?null:n); })(),
       wx1: r[8]||null, wx2: r[9]||null, wx3: r[10]||null,
       receiver: r[11]||null, phone: r[12]||null, address: r[13]||null,
-      track: r[14]||null, cate: r[15]||null, abnormal: r[16]||null
+      track: r[14]||null, cate: r[15]||null, coop: r[16]||null, mark: r[17]||null,
+      abnormal: r[18]||null
     };
   }
   function objToRow(o){
+    // 顺序必须与 IDX 一致：14=track 15=cate 16=coop 17=mark 18=abn 19=team(派生)
     return [
       o.platform||'', o.nickname||'', o.handle||'', o.uid||'',
       (o.fans==null?'':String(o.fans)), o.ctype||'', o.clevel||'',
       (o.sales==null?'':String(o.sales)),
       o.wx1||'', o.wx2||'', o.wx3||'',
       o.receiver||'', o.phone||'', o.address||'',
-      o.track||'', o.cate||'', o.abnormal||'', ''
+      o.track||'', o.cate||'', o.coop||'', o.mark||'', o.abnormal||'', ''
     ];
   }
 
@@ -2050,7 +2383,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     try{
       const data = await cbFetch('/'+CB.table+'?select=*&order=created_at.desc&limit=2000');
       if (Array.isArray(data)){
-        // ① 先把云端的增量字段（赛道/分类/异常）合并到已有行
+        // ① 先把云端的增量字段（合作类型/赛道/分类/标记/异常）合并到已有行
         const byHandle = new Map(), byUid = new Map(), byId = new Map();
         ALL.forEach(r=>{ if(r[2]) byHandle.set(String(r[2]).trim(), r); if(r[3]) byUid.set(String(r[3]).trim(), r); });
         let patched = 0;
@@ -2064,7 +2397,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             let ch = false;
             if (!hit[14] && o.track){ hit[14] = o.track; ch = true; }
             if (!hit[15] && o.cate){ hit[15] = o.cate; ch = true; }
-            if (o.abnormal === ABNORMAL){ if (hit[16] !== ABNORMAL){ hit[16] = ABNORMAL; ch = true; } }
+            if (!hit[16] && o.coop){ hit[16] = o.coop; ch = true; }
+            if (!hit[17] && o.mark){ hit[17] = o.mark; ch = true; }
+            if (o.abnormal === ABNORMAL){ if (hit[18] !== ABNORMAL){ hit[18] = ABNORMAL; ch = true; } }
             if (ch) patched++;
             return;
           }
@@ -2141,11 +2476,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     { k:'clevel',   label:'带货等级',
       alias:['带货等级','等级','级别','达人等级','带货级别','lv'] },
     { k:'ctype',    label:'带货类型',
-      alias:['带货类型','类型','直播类型','带货方式'] },
+      alias:['带货类型','类型','直播类型','带货方式','带货形式'] },
+    { k:'coop',     label:'合作类型',
+      alias:['合作类型','合作方式','合作模式','合作形式','合作'] },
     { k:'track',    label:'达人赛道',
       alias:['达人赛道','赛道','达人类型','内容赛道'] },
     { k:'cate',     label:'带货分类',
       alias:['带货分类','分类','品类','带货品类'] },
+    { k:'mark',     label:'达人标记',
+      alias:['达人标记','标记','达人标签','标签标记','预算稿费标记'] },
     { k:'sales',    label:'近30日销量',
       alias:['近30日销量','销量','销售额','近30天销量','30日销量','月销量','销量(件)'] }
   ];
@@ -2532,7 +2871,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     {k:'handle',   label:'达人号',    type:'text',  ph:'抖音号（身份识别优先用它）'},
     {k:'uid',      label:'达人UID',   type:'text',  ph:'数字 UID（达人选达人号时可只填它）'},
     {k:'fans',     label:'粉丝数',    type:'number',ph:'如 12500'},
-    {k:'ctype',    label:'带货类型',  type:'text',  ph:'如 美食 / 母婴'},
+    {k:'ctype',    label:'带货类型',  type:'select', opts:CTYPES},
+    {k:'coop',     label:'合作类型',  type:'select', opts:COOPS},
     {k:'clevel',   label:'带货等级',  type:'text',  ph:'如 L3 / 铜牌'},
     {k:'sales',    label:'近30日销量',type:'number',ph:'如 320'},
     {k:'wx1',      label:'达人微信号', type:'text', ph:'含字母才算有效'},
@@ -2734,7 +3074,14 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   $('#mCancel').onclick = closeModal;
   $('#mSubmit').onclick = submitEntry;
   $('#modal').addEventListener('click', e=>{ if (e.target.id === 'modal') closeModal(); });
-  document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ closeModal(); closeImp(); } });
+
+  // 达人标记弹窗
+  $('#markClose').onclick  = closeMarkPick;
+  $('#markCancel').onclick = closeMarkPick;
+  $('#markOk').onclick     = submitMark;
+  $('#markModal').addEventListener('click', e=>{ if (e.target.id === 'markModal') closeMarkPick(); });
+
+  document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ closeModal(); closeImp(); closeMarkPick(); } });
 
   // 导入表格
   $('#impBtn').onclick = openImp;  $('#impClose').onclick = closeImp;
