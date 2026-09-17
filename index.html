@@ -222,14 +222,19 @@ td.addr .cpv>span:first-child{white-space:normal;word-break:break-all}
 
 .empty{color:var(--tx3)}
 .unk{display:inline-block;color:#9aa3ae;background:#f2f3f5;border:1px dashed #d9dde2;border-radius:5px;padding:0.5px 7px;font-size:11.5px;font-style:normal}
-/* 单元格悬停浮层：复制 / 修改 */
+/* 单元格操作浮层：点击格子才出现，点空白页处才收起（鼠标移开不会消失） */
 .fillwrap{position:relative;display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}
 .celltools{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:6px;display:none;align-items:center;gap:4px;z-index:20}
-.fillwrap:hover .celltools{display:inline-flex}
+.fillwrap.open .celltools{display:inline-flex}
+/* 已打开操作的小格子加一圈淡边，一眼看出当前在建的是哪格 */
+.fillwrap.open{background:#eef3fe;border-radius:6px;box-shadow:0 0 0 2px #eef3fe}
 .ctbtn{font:inherit;font-size:11px;line-height:1;padding:3px 7px;border-radius:5px;border:1px solid #d9dde2;background:#fff;color:#4a5563;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(20,30,50,.09);transition:all .13s}
 .ctbtn:hover{background:#eef3fe;border-color:#5b8def;color:#2f6ee0}
-.ctbtn.edit{background:#fff7ed;border-color:#f3d3a8;color:#b06a12}
+.ctbtn.edit{background:#fff7ed;border-color:#f3d3a8;color:#b06a12;font-weight:700}
 .ctbtn.edit:hover{background:#ffedd5;border-color:#e89a3c;color:#8a4f06}
+/* 整行复制按钮：跟在「补充/修改」后面，绿色区分 */
+.ctbtn.row{background:#f0f7ff;border-color:#cadcf5;color:#2c5f9e}
+.ctbtn.row:hover{background:#e2eefd;border-color:#8fb4e3;color:#1f4f8a}
 /* 表格最后一列浮层改为向左弹出，避免溢出 */
 td:last-child .celltools{left:auto;right:100%;margin-left:0;margin-right:6px}
 /* 就地编辑输入框 */
@@ -256,7 +261,7 @@ td.cent{text-align:center;white-space:nowrap}
      padding:2px 8px;font-size:11px;font-weight:600;cursor:help;white-space:nowrap}
 tr.row-abn{background:#fff6f6}
 tr.row-abn:hover{background:#ffeeee}
-tr.row-team td:nth-child(18){background:#f7faff}
+tr.row-team td.teamtd{background:#f7faff}
 
 /* 异常/团 提示条 */
 .warnbar{background:var(--card);border:1px solid #f5c2c2;border-radius:12px;padding:12px 16px;margin-bottom:14px;
@@ -501,8 +506,20 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 <script>
 (function () {
   'use strict';
-  const HEADER = ['平台','达人昵称','达人号','达人UID','粉丝数','带货类型','带货等级','近30日销量','达人微信号','达人微信号2','达人微信号3','收货人','收货人手机号','收货人地址','达人赛道','带货分类','异常','团标识'];
   const IDX = {plat:0,nick:1,handle:2,uid:3,fans:4,type:5,level:6,sales:7,wx1:8,wx2:9,wx3:10,recv:11,phone:12,addr:13,track:14,cate:15,abn:16,team:17};
+  // 显示顺序（表头 / 表体 / 导出共用）：数据索引按这个数组重排
+  // 注意：只改「显示顺序」，data/*.js 里的物理列索引一律不动
+  const COLS = [
+    IDX.plat, IDX.nick, IDX.handle, IDX.uid, IDX.fans,
+    IDX.type, IDX.track, IDX.cate, IDX.level, IDX.sales,   // 赛道 / 分类 插在类型与等级之间
+    IDX.wx1, IDX.wx2, IDX.wx3, IDX.recv, IDX.phone, IDX.addr,
+    IDX.abn, IDX.team
+  ];
+  const HEADER = ['平台','达人昵称','达人号','达人UID','粉丝数','带货类型','达人赛道','带货分类','带货等级','近30日销量','达人微信号','达人微信号2','达人微信号3','收货人','收货人手机号','收货人地址','异常','团标识'];
+  // 显示列号（0..17） → 数据列号
+  const V2D = COLS;
+  // 数据列号 → 显示列号
+  const D2V = (()=>{ const m={}; COLS.forEach((d,v)=>m[d]=v); return m; })();
   const NCOL = HEADER.length;   // 18
   const PER = 50;
   const CAND_MAX = 150;   // 相似候选池上限，防止卡顿
@@ -1010,9 +1027,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       });
     }
     if (state.sortKey>=0 && !(state.sim && state.q)){
-      const k=state.sortKey, d=state.sortDir;
+      const dIdx = V2D[state.sortKey] != null ? V2D[state.sortKey] : state.sortKey;  // 显示列 → 数据列
+      const d=state.sortDir;
       state.result.sort((a,b)=>{
-        const x=a[k], y=b[k];
+        const x=a[dIdx], y=b[dIdx];
         const nx=Number(x), ny=Number(y);
         if (!isNaN(nx)&&!isNaN(ny)&&x!==''&&y!=='') return (nx-ny)*d;
         return String(x).localeCompare(String(y),'zh')*d;
@@ -1203,33 +1221,35 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         const tr=el('tr', cls || null);
         // 字段索引 → 云端字段名（用于就地补录/修改）
         const IDX2KEY = {8:'wx1', 9:'wx2', 10:'wx3', 11:'receiver', 12:'phone', 13:'address'};
-        // 悬停浮层：复制 + 修改
+        // 操作浮层：复制本条 + 补充/修改
+        //   有值 → 复制 / 修改 ；无值 → 补充（无内容可复制）
         const tools = (idx, val) => {
           const key = IDX2KEY[idx];
           if (!key) return '';
           const has = !isUnk(val);
           return '<span class="celltools">'+
-                   (has ? '<button class="ctbtn" data-copy="'+esc(val)+'" title="复制">复制</button>' : '')+
-                   '<button class="ctbtn edit" data-fill="'+idx+'" title="'+(has?'修改':'补充')+'">'+(has?'修改':'补充')+'</button>'+
+                   (has ? '<button type="button" class="ctbtn" data-copy="'+esc(val)+'" title="复制这一格的内容">复制</button>' : '')+
+                   '<button type="button" class="ctbtn edit" data-fill="'+idx+'" title="'+(has?'点这里修改这一格':'点这里补充这一格')+'">'+(has?'修改':'补充')+'</button>'+
+                   '<button type="button" class="ctbtn row" data-rowcopy-btn title="复制这位达人的全部信息">复制本条</button>'+
                  '</span>';
         };
         // 空值格子
         const unkCell = (idx, extraCls) => {
           const key = IDX2KEY[idx];
           if (!key) return '<span class="unk">'+UNK+'</span>';
-          return '<span class="fillwrap'+(extraCls?' '+extraCls:'')+'" data-idx="'+idx+'">'+
+          return '<span class="fillwrap'+(extraCls?' '+extraCls:'')+'" data-idx="'+idx+'" data-fillnull="'+idx+'" title="点这里补充'+FILL_LABEL[key]+'">'+
                    '<span class="unkfill">'+UNK+'</span>'+ tools(idx, '') +
                  '</span>';
         };
         const wxCell = (v, idx) => isUnk(v) ? unkCell(idx)
-                                     : '<span class="fillwrap" data-idx="'+idx+'">'+
+                                     : '<span class="fillwrap" data-idx="'+idx+'" data-fillnull="'+idx+'" title="点这里可复制 / 修改">'+
                                          '<span class="wxval" data-copy="'+esc(v)+'">'+esc(v)+'</span>'+ tools(idx, v) +
                                        '</span>';
         // 通用可复制单元格
         const cpCell = (v, extraCls, mono, idx) => {
           if (isUnk(v)) return idx != null ? unkCell(idx, extraCls) : '<span class="unk">'+UNK+'</span>';
           const cls = 'cpv' + (extraCls ? ' '+extraCls : '') + (mono ? ' mono' : '');
-          return '<span class="fillwrap" data-idx="'+idx+'">'+
+          return '<span class="fillwrap" data-idx="'+idx+'" data-fillnull="'+idx+'" title="点这里可复制 / 修改">'+
                    '<span class="'+cls+'" data-copy="'+esc(v)+'">'+esc(v)+'</span>'+ tools(idx, v) +
                  '</span>';
         };
@@ -1238,32 +1258,47 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         const isBase = simOn && i===0;
         const srcTag = r.__src === 'remote' ? '<span class="tagsrc remote">共建</span>'
                      : r.__src === 'local'  ? '<span class="tagsrc local">本机</span>' : '';
-        tr.innerHTML =
-          '<td>'+(isUnk(r[0])?'<span class="unk">'+UNK+'</span>':'<span class="tag plat">'+esc(r[0])+'</span>')+(isBase?' <span class="tag lv" style="background:var(--okbg);color:#0b7a3d">基准</span>':'')+'</td>'+
-          '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="点击复制：'+esc(r[1])+'">'+esc(r[1])+'</span>')+srcTag+'</td>'+
-          '<td class="uid">'+cpCell(r[2],'uidv')+'</td>'+
-          '<td class="uid">'+cpCell(r[3],'uidv')+'</td>'+
-          '<td class="num">'+(isUnk(r[4])?'<span class="unk">'+UNK+'</span>':fmt(r[4]))+'</td>'+
-          '<td>'+(isUnk(r[5])?'<span class="unk">'+UNK+'</span>':'<span class="tag">'+esc(r[5])+'</span>')+'</td>'+
-          '<td>'+lv+'</td>'+
-          '<td class="num">'+(isUnk(r[7])?'<span class="unk">'+UNK+'</span>':fmt(r[7]))+'</td>'+
-          '<td class="wx">'+wxCell(r[8], 8)+'</td>'+
-          '<td class="wx">'+wxCell(r[9], 9)+'</td>'+
-          '<td class="wx">'+wxCell(r[10], 10)+'</td>'+
-          '<td>'+cpCell(r[11],'recvv', false, 11)+'</td>'+
-          '<td>'+cpCell(r[12],'phonev', true, 12)+'</td>'+
-          '<td class="addr">'+cpCell(r[13],'addrv', false, 13)+'</td>'+
-          // 达人赛道
-          '<td>'+(isUnk(r[14])?'<span class="unk">'+UNK+'</span>':'<span class="tag track">'+esc(r[14])+'</span>')+'</td>'+
-          // 带货分类
-          '<td>'+(isUnk(r[15])?'<span class="unk">'+UNK+'</span>':'<span class="tag cate">'+esc(r[15])+'</span>')+'</td>'+
-          // 异常标（只读展示：标记只能加，不能由网页端移除）
-          '<td class="cent">'+(r[16]===ABNORMAL
-              ? '<span class="abn" title="该达人已被标记为异常">⚠ 异常</span>'
-              : '<span class="abn-add" data-abn="0" title="标记为异常达人">+ 标记</span>')+'</td>'+
-          // 团标识
-          '<td class="cent">'+teamCell(r)+'</td>';
+        // 单元格渲染分派：入参是「数据列号」，与显示顺序解耦
+        const cellOf = (di) => {
+          switch(di){
+            case 0:  // 平台
+              return '<td>'+(isUnk(r[0])?'<span class="unk">'+UNK+'</span>':'<span class="tag plat">'+esc(r[0])+'</span>')+(isBase?' <span class="tag lv" style="background:var(--okbg);color:#0b7a3d">基准</span>':'')+'</td>';
+            case 1:  // 达人昵称
+              return '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="点击复制：'+esc(r[1])+'">'+esc(r[1])+'</span>')+srcTag+'</td>';
+            case 2:  // 达人号
+              return '<td class="uid">'+cpCell(r[2],'uidv')+'</td>';
+            case 3:  // 达人UID
+              return '<td class="uid">'+cpCell(r[3],'uidv')+'</td>';
+            case 4:  // 粉丝数
+              return '<td class="num">'+(isUnk(r[4])?'<span class="unk">'+UNK+'</span>':fmt(r[4]))+'</td>';
+            case 5:  // 带货类型
+              return '<td>'+(isUnk(r[5])?'<span class="unk">'+UNK+'</span>':'<span class="tag">'+esc(r[5])+'</span>')+'</td>';
+            case 6:  // 带货等级
+              return '<td>'+lv+'</td>';
+            case 7:  // 近30日销量
+              return '<td class="num">'+(isUnk(r[7])?'<span class="unk">'+UNK+'</span>':fmt(r[7]))+'</td>';
+            case 8:  return '<td class="wx">'+wxCell(r[8], 8)+'</td>';
+            case 9:  return '<td class="wx">'+wxCell(r[9], 9)+'</td>';
+            case 10: return '<td class="wx">'+wxCell(r[10], 10)+'</td>';
+            case 11: return '<td>'+cpCell(r[11],'recvv', false, 11)+'</td>';
+            case 12: return '<td>'+cpCell(r[12],'phonev', true, 12)+'</td>';
+            case 13: return '<td class="addr">'+cpCell(r[13],'addrv', false, 13)+'</td>';
+            case 14: // 达人赛道
+              return '<td>'+(isUnk(r[14])?'<span class="unk">'+UNK+'</span>':'<span class="tag track">'+esc(r[14])+'</span>')+'</td>';
+            case 15: // 带货分类
+              return '<td>'+(isUnk(r[15])?'<span class="unk">'+UNK+'</span>':'<span class="tag cate">'+esc(r[15])+'</span>')+'</td>';
+            case 16: // 异常标（只读展示：标记只能加，不能由网页端移除）
+              return '<td class="cent">'+(r[16]===ABNORMAL
+                  ? '<span class="abn" title="该达人已被标记为异常">⚠ 异常</span>'
+                  : '<span class="abn-add" data-abn="0" title="标记为异常达人">+ 标记</span>')+'</td>';
+            case 17: // 团标识
+              return '<td class="cent teamtd">'+teamCell(r)+'</td>';
+          }
+          return '<td></td>';
+        };
+        tr.innerHTML = COLS.map(cellOf).join('');
         // 整行复制：双击任意行 = 复制该达人全部信息（纯文本，便于贴给对方）
+        tr.dataset.nick = r[1] || '';
         tr.dataset.rowcopy = [
           '昵称：'+(r[1]||''),
           '平台：'+(r[0]||''),
@@ -1409,10 +1444,43 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     });
   }
 
-  // 双击整行 → 复制该达人全部信息
+  // ---------------- 单元格操作浮层：点格子打开，点别处收起 ----------------
+  //  为什么要这样：早先用 :hover 控制，鼠标从格子移到按钮中间会断开 hover，按钮瞬间消失，
+  //  根本点不到；双击又会触发「复制整行」。改成点击式，按钮常驻到点空白处为止。
+  function closeTools(){
+    document.querySelectorAll('.fillwrap.open').forEach(w=>w.classList.remove('open'));
+  }
+  document.addEventListener('click', e=>{
+    // 点在自己的操作浮层里 → 不收起（由各自的按钮逻辑处理）
+    if (e.target.closest('.celltools')) return;
+    const wrap = e.target.closest('.fillwrap');
+    closeTools();
+    if (!wrap) return;
+    // 打开被点格子的浮层
+    wrap.classList.add('open');
+  }, true);   // 捕获阶段先跑，保证按钮逻辑执行时浮层还在
+
+  // 「复制本条」按钮 → 复制整行信息
+  document.addEventListener('click', async e=>{
+    const b = e.target.closest('[data-rowcopy-btn]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const tr = b.closest('tr[data-rowcopy]');
+    if (!tr) return;
+    const v = tr.dataset.rowcopy;
+    if (!v) return;
+    const ok = await copyText(v);
+    tr.classList.add('row-copied');
+    setTimeout(()=>tr.classList.remove('row-copied'), 700);
+    closeTools();
+    if (ok) toast('已复制「'+(tr.dataset.nick||'该达人')+'」全部信息（'+v.split('\n').length+' 项）');
+    else toast('复制失败，请手动选择复制', 'err');
+  });
+
+  // 双击整行 → 复制该达人全部信息（保留快捷方式，但排除所有按钮与可编辑单元格）
   document.addEventListener('dblclick', async e=>{
     if (e.target.closest('button,a,select,input')) return;
-    if (e.target.closest('[data-fill]')) return;   // 未知格子：点它是补录，不是复制
+    if (e.target.closest('[data-fillnull]')) return;   // 可补充/修改的格子：双击不复制整行
     const tr = e.target.closest('tr[data-rowcopy]');
     if (!tr) return;
     const v = tr.dataset.rowcopy;
@@ -1430,33 +1498,26 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     setTimeout(()=>el.classList.remove('copied'), 620);
   }
 
+  // 点「复制」按钮（浮层内）或昵称 → 复制内容
   document.addEventListener('click', async e=>{
-    const w = e.target.closest('[data-copy]');
+    const btn = e.target.closest('.ctbtn[data-copy]');
+    const plain = e.target.closest('.nickv[data-copy]');   // 昵称：点击即复制，无浮层
+    const w = btn || plain;
     if (!w) return;
     e.preventDefault(); e.stopPropagation();
     const v = w.dataset.copy;
     const ok = await copyText(v);
     flashCopied(w);
+    closeTools();
     if (ok){
       const short = String(v).length > 26 ? String(v).slice(0,26)+'…' : v;
       toast('已复制：'+short);
     } else {
-      toast('复制失败，请长按/右键选择复制');
+      toast('复制失败，请长按/右键选择复制', 'err');
     }
   });
 
-  // 整个内容单元格点击也能复制（扩大热区，降低操作难度）
-  document.addEventListener('click', async e=>{
-    if (e.target.closest('[data-copy]')) return;          // 已由上面处理
-    if (e.target.closest('button,a,select,input')) return; // 不干扰按钮
-    const cell = e.target.closest('td.cp-td');
-    if (!cell) return;
-    const v = cell.dataset.val;
-    if (!v) return;
-    const ok = await copyText(v);
-    flashCopied(cell);
-    if (ok) toast('已复制：'+(String(v).length>26?String(v).slice(0,26)+'…':v));
-  });
+  // （已移除旧的 td.cp-td 整格复制死代码：现在统一由 .fillwrap 浮层承担）
 
   // ============================================================
   //  就地补录：点击「未知」格子 → 原地变输入框 → 粘贴 → 回车提交
@@ -1490,14 +1551,14 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     const host = wrap || cell;
     const oldHTML = host.innerHTML;
     const label = FILL_LABEL[key] || '内容';
-    const origVal = r[idx];
 
     // 原地替换成输入框
     host.innerHTML = '<input class="fillinp" type="text" value="'+esc(curVal)+'" placeholder="粘贴'+esc(label)+'，回车提交" />';
+    host.classList.add('open');
     const inp = host.querySelector('.fillinp');
     inp.focus(); inp.select();
 
-    const restore = () => { filling = false; host.innerHTML = oldHTML; };
+    const restore = () => { filling = false; host.innerHTML = oldHTML; closeTools(); };
 
     const doSubmit = async () => {
       const val = String(inp.value || '').trim();
@@ -1674,7 +1735,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if(!res.length) return toast('当前没有可导出的结果');
     const q=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
     const lines=[HEADER.join(',')];
-    res.forEach(r=>lines.push(r.map(q).join(',')));
+    res.forEach(r=>lines.push(COLS.map(di=>q(r[di])).join(',')));   // 按显示顺序导出
     const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
