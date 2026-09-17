@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>晨小安 · 达人名录查询</title>
+<title>BD · 达人名录查询</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -22,7 +22,7 @@ a:hover{text-decoration:underline}
 header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .hwrap{max-width:1440px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;white-space:nowrap}
-.logo i{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;display:grid;place-items:center;font-style:normal;font-size:14px;font-weight:700}
+.logo i{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.3px}
 .logo small{font-weight:400;color:var(--tx3);font-size:12px;margin-left:2px}
 .searchbox{flex:1;min-width:260px;position:relative}
 .searchbox input{width:100%;height:40px;border:1.5px solid var(--line);border-radius:10px;padding:0 78px 0 38px;font-size:14px;background:#fff;outline:none;transition:.15s}
@@ -222,14 +222,19 @@ td.addr .cpv>span:first-child{white-space:normal;word-break:break-all}
 
 .empty{color:var(--tx3)}
 .unk{display:inline-block;color:#9aa3ae;background:#f2f3f5;border:1px dashed #d9dde2;border-radius:5px;padding:0.5px 7px;font-size:11.5px;font-style:normal}
-/* 「未知」可补录格子：点击就地填值 */
-.unkfill{display:inline-flex;align-items:center;gap:3px;color:#9aa3ae;background:#f2f3f5;border:1px dashed #c8cfd8;border-radius:5px;padding:0.5px 7px;font-size:11.5px;cursor:pointer;transition:all .15s;user-select:none}
-.unkfill:hover{background:#e8f0fe;border-color:#5b8def;color:#2f6ee0;border-style:solid}
-.unkfill .pen{font-size:9.5px;opacity:.55;line-height:1}
-.unkfill:hover .pen{opacity:1}
-.fillinp{width:100%;min-width:88px;box-sizing:border-box;font:inherit;font-size:12px;padding:2px 6px;border:1px solid #5b8def;border-radius:5px;outline:none;background:#fff;box-shadow:0 0 0 3px rgba(91,141,239,.14)}
-td .fillinp{min-width:84px}
-.addr .fillinp{min-width:150px}
+/* 单元格悬停浮层：复制 / 修改 */
+.fillwrap{position:relative;display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}
+.celltools{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:6px;display:none;align-items:center;gap:4px;z-index:20}
+.fillwrap:hover .celltools{display:inline-flex}
+.ctbtn{font:inherit;font-size:11px;line-height:1;padding:3px 7px;border-radius:5px;border:1px solid #d9dde2;background:#fff;color:#4a5563;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(20,30,50,.09);transition:all .13s}
+.ctbtn:hover{background:#eef3fe;border-color:#5b8def;color:#2f6ee0}
+.ctbtn.edit{background:#fff7ed;border-color:#f3d3a8;color:#b06a12}
+.ctbtn.edit:hover{background:#ffedd5;border-color:#e89a3c;color:#8a4f06}
+/* 表格最后一列浮层改为向左弹出，避免溢出 */
+td:last-child .celltools{left:auto;right:100%;margin-left:0;margin-right:6px}
+/* 就地编辑输入框 */
+.fillinp{width:100%;min-width:92px;box-sizing:border-box;font:inherit;font-size:12px;padding:3px 7px;border:1px solid #5b8def;border-radius:5px;outline:none;background:#fff;color:inherit;box-shadow:0 0 0 3px rgba(91,141,239,.14)}
+.addr .fillinp,td.addr .fillinp{min-width:180px}
 .chip.unkchip{border-style:dashed;color:#8a929c}
 .chip.unkchip.on{background:#f2f3f5;border-color:#98a1ad;color:var(--tx2)}
 .tag{display:inline-block;font-size:11.5px;padding:1.5px 7px;border-radius:5px;background:#eef0f3;color:var(--tx2);white-space:nowrap}
@@ -311,7 +316,7 @@ tr.mark-row:hover{background:#fff5f0}
 
 <header>
   <div class="hwrap">
-    <div class="logo"><i>晨</i>达人名录查询<small id="totTxt"></small></div>
+    <div class="logo"><i>BD</i>达人名录查询<small id="totTxt"></small></div>
     <div class="searchbox">
       <span class="ico">⌕</span>
       <input id="q" type="search" placeholder="搜昵称 / 达人号 / 微信号 / 手机号 / 收货人 / 地址…（支持空格多关键词）" autocomplete="off">
@@ -1196,22 +1201,37 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         const isAbn = r[16] === ABNORMAL;
         const cls = (isAbn ? 'row-abn' : '') + ((state.markSet && state.markSet.has(r)) ? ' mark-row' : '');
         const tr=el('tr', cls || null);
-        // 字段索引 → 云端字段名（用于就地补录）
+        // 字段索引 → 云端字段名（用于就地补录/修改）
         const IDX2KEY = {8:'wx1', 9:'wx2', 10:'wx3', 11:'receiver', 12:'phone', 13:'address'};
-        // 「未知」可补录格子：点击就地变输入框
+        // 悬停浮层：复制 + 修改
+        const tools = (idx, val) => {
+          const key = IDX2KEY[idx];
+          if (!key) return '';
+          const has = !isUnk(val);
+          return '<span class="celltools">'+
+                   (has ? '<button class="ctbtn" data-copy="'+esc(val)+'" title="复制">复制</button>' : '')+
+                   '<button class="ctbtn edit" data-fill="'+idx+'" title="'+(has?'修改':'补充')+'">'+(has?'修改':'补充')+'</button>'+
+                 '</span>';
+        };
+        // 空值格子
         const unkCell = (idx, extraCls) => {
           const key = IDX2KEY[idx];
           if (!key) return '<span class="unk">'+UNK+'</span>';
-          return '<span class="unkfill'+(extraCls?' '+extraCls:'')+'" data-fill="'+idx+'"'+
-                 ' title="点击补充'+FILL_LABEL[key]+'">'+UNK+'<span class="pen">✎</span></span>';
+          return '<span class="fillwrap'+(extraCls?' '+extraCls:'')+'" data-idx="'+idx+'">'+
+                   '<span class="unkfill">'+UNK+'</span>'+ tools(idx, '') +
+                 '</span>';
         };
         const wxCell = (v, idx) => isUnk(v) ? unkCell(idx)
-                                     : '<span class="wxval" data-copy="'+esc(v)+'">'+esc(v)+'<span class="cp">⧉</span></span>';
-        // 通用可复制单元格：点击即复制，悬停显示「复制」提示
+                                     : '<span class="fillwrap" data-idx="'+idx+'">'+
+                                         '<span class="wxval" data-copy="'+esc(v)+'">'+esc(v)+'</span>'+ tools(idx, v) +
+                                       '</span>';
+        // 通用可复制单元格
         const cpCell = (v, extraCls, mono, idx) => {
           if (isUnk(v)) return idx != null ? unkCell(idx, extraCls) : '<span class="unk">'+UNK+'</span>';
           const cls = 'cpv' + (extraCls ? ' '+extraCls : '') + (mono ? ' mono' : '');
-          return '<span class="'+cls+'" data-copy="'+esc(v)+'" title="点击复制：'+esc(v)+'">'+esc(v)+'<span class="cp">⧉</span></span>';
+          return '<span class="fillwrap" data-idx="'+idx+'">'+
+                   '<span class="'+cls+'" data-copy="'+esc(v)+'">'+esc(v)+'</span>'+ tools(idx, v) +
+                 '</span>';
         };
         const lv = isUnk(r[6]) ? '<span class="unk">'+UNK+'</span>'
                                : '<span class="tag lv">'+esc(r[6])+'</span>';
@@ -1220,7 +1240,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
                      : r.__src === 'local'  ? '<span class="tagsrc local">本机</span>' : '';
         tr.innerHTML =
           '<td>'+(isUnk(r[0])?'<span class="unk">'+UNK+'</span>':'<span class="tag plat">'+esc(r[0])+'</span>')+(isBase?' <span class="tag lv" style="background:var(--okbg);color:#0b7a3d">基准</span>':'')+'</td>'+
-          '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="点击复制：'+esc(r[1])+'">'+esc(r[1])+'<span class="cp">⧉</span></span>')+srcTag+'</td>'+
+          '<td class="nick">'+(isUnk(r[1])?'<span class="unk">'+UNK+'</span>':'<span class="cpv nickv" data-copy="'+esc(r[1])+'" title="点击复制：'+esc(r[1])+'">'+esc(r[1])+'</span>')+srcTag+'</td>'+
           '<td class="uid">'+cpCell(r[2],'uidv')+'</td>'+
           '<td class="uid">'+cpCell(r[3],'uidv')+'</td>'+
           '<td class="num">'+(isUnk(r[4])?'<span class="unk">'+UNK+'</span>':fmt(r[4]))+'</td>'+
@@ -1449,9 +1469,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if (filling) return;
     e.preventDefault(); e.stopPropagation();
 
+    const wrap = cell.closest('.fillwrap') || cell.closest('td');
     const tr = cell.closest('tr');
     if (!tr) return;
-    tr.dataset.inline = '1';
 
     const idx = Number(cell.dataset.fill);
     const key = {8:'wx1',9:'wx2',10:'wx3',11:'receiver',12:'phone',13:'address'}[idx];
@@ -1463,27 +1483,38 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     const r = state.result[start + rowIdx];
     if (!r) return;
 
+    const curVal = isUnk(r[idx]) ? '' : String(r[idx]).trim();
+    const isEdit = !!curVal;              // 已有值 = 修改；空值 = 补充
+
     filling = true;
-    const oldHTML = cell.outerHTML;
+    const host = wrap || cell;
+    const oldHTML = host.innerHTML;
     const label = FILL_LABEL[key] || '内容';
+    const origVal = r[idx];
 
     // 原地替换成输入框
-    cell.innerHTML = '<input class="fillinp" type="text" placeholder="粘贴'+esc(label)+'，回车提交" />';
-    const inp = cell.querySelector('.fillinp');
-    inp.focus();
+    host.innerHTML = '<input class="fillinp" type="text" value="'+esc(curVal)+'" placeholder="粘贴'+esc(label)+'，回车提交" />';
+    const inp = host.querySelector('.fillinp');
+    inp.focus(); inp.select();
 
-    const restore = () => { filling = false; cell.outerHTML = oldHTML; };
+    const restore = () => { filling = false; host.innerHTML = oldHTML; };
 
     const doSubmit = async () => {
       const val = String(inp.value || '').trim();
       if (!val){ toast('没有填写内容'); restore(); return; }
+      if (val === curVal){ restore(); return; }
+
+      // 修改已有值 → 必须二次确认（数据库端也会拦截，这里提前告知）
+      if (isEdit){
+        if (!confirm('确定把「'+(r[1]||'该达人')+'」的'+label+'改成：\n\n'+val+'\n\n原值：'+curVal+'\n\n⚠️ 修改已有联系方式会影响所有使用本页的人，请确认无误。')) { restore(); return; }
+      }
+
       inp.disabled = true;
       inp.placeholder = '提交中…';
 
       const patch = {};
       patch[key] = val;
 
-      // 优先按云端 id 更新；没有 id 则按 handle/uid 定位
       try{
         if (!isCfgOk()) throw new Error('云端未配置');
         let okCloud = false;
@@ -1492,7 +1523,6 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
           await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(r.__id), {method:'PATCH', body:patch});
           okCloud = true;
         } else {
-          // 本地基础数据：先确认云端是否已有这条（别人可能建过）
           const h = String(r[2]||'').trim(), u = String(r[3]||'').trim();
           if (!h && !u) throw new Error('该行缺少达人号与UID，无法定位');
           const q = h ? 'handle=eq.'+encodeURIComponent(h) : 'uid=eq.'+encodeURIComponent(u);
@@ -1500,15 +1530,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
           if (Array.isArray(found) && found.length){
             const rec = found[0];
-            // 已有值 → 不允许改写
-            if (String(rec[key]||'').trim()){
-              throw new Error('该'+label+'已存在（'+rec[key]+'），只能补充空字段');
+            const cloudVal = String(rec[key]||'').trim();
+            // 云端已有值 且 与当前显示值不同 → 说明是别人填的，禁止改写
+            if (cloudVal && cloudVal !== curVal){
+              throw new Error('云端已有'+label+'「'+cloudVal+'」，不可覆盖');
             }
             await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(rec.id), {method:'PATCH', body:patch});
             r.__id = rec.id;
             okCloud = true;
           } else {
-            // 云端没有 → 新建一条增量记录
             const body = {
               platform: r[0]||null, nickname: r[1]||'', handle: r[2]||null, uid: r[3]||null,
               editor: '2517', source: 'web'
@@ -1522,11 +1552,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
         if (okCloud !== true) throw new Error('云端写入失败');
 
-        // 本地立即反映
         r[idx] = val;
         r.__src = 'remote';
+        toast((isEdit?'已修改':'已补充')+'「'+(r[1]||'该达人')+'」的'+label+'：'+val);
         restore();
-        toast('已补充「'+(r[1]||'该达人')+'」的'+label+'：'+val);
         apply();
       }catch(err){
         inp.disabled = false;
@@ -1540,7 +1569,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (ev.key === 'Enter'){ ev.preventDefault(); doSubmit(); }
       else if (ev.key === 'Escape'){ ev.preventDefault(); restore(); }
     });
-    inp.addEventListener('blur', ()=>{ if (filling && !inp.disabled) setTimeout(()=>{ if (filling) restore(); }, 180); });
+    inp.addEventListener('blur', ()=>{ if (filling && !inp.disabled) setTimeout(()=>{ if (filling) restore(); }, 220); });
   });
 
   // 异常标记：只允许「新增标记」，网页端不提供移除/删除能力
