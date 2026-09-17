@@ -1036,19 +1036,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       c.dataset.plat=k; fPlat.appendChild(c);
     });
     const fType=$('#fType');
-    // 带货类型：固定枚举恒常可见（与赛道/分类同理），枚举外的历史值按数量补在后面
-    CTYPES.forEach(k=>{ if(!(k in types)) types[k]=0; });
-    const tKeys = Object.keys(types).filter(k=>k!==UNK);
-    tKeys.sort((a,b)=>{
-      const ia=CTYPES.indexOf(a), ib=CTYPES.indexOf(b);
-      if(ia>=0&&ib>=0) return ia-ib;
-      if(ia>=0) return -1;
-      if(ib>=0) return 1;
-      return (types[b]||0)-(types[a]||0);
-    });
-    if (types[UNK]) tKeys.push(UNK);
-    tKeys.forEach(k=>{
-      const c=el('button','chip'+(k===UNK?' unkchip':''), esc(k)+' <span style="opacity:.55">'+types[k]+'</span>');
+    // 带货类型：平台给的【固定枚举】，只渲染这 5 项，不出现枚举外的历史值与「未知」
+    CTYPES.forEach(k=>{
+      const c=el('button','chip', esc(k)+' <span style="opacity:.55">'+(types[k]||0)+'</span>');
       c.dataset.type=k; fType.appendChild(c);
     });
     const fLevel=$('#fLevel');
@@ -1209,9 +1199,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       const p = isUnk(r[0]) ? UNK : r[0];
       if (!state.plat.has(p)) return false;
     }
-    // 带货类型（含「未知」）
+    // 带货类型（固定枚举：值不在枚举内的历史行不会被任何枚举项命中）
     if (state.type.size){
-      const t = isUnk(r[5]) ? UNK : r[5];
+      const t = String(r[5]||'').trim();
       if (!state.type.has(t)) return false;
     }
     // 带货等级（含「未知」）
@@ -1914,9 +1904,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     // 原地替换成输入控件：枚举字段给下拉框，其余给文本/数字框
     if (opts){
       w.innerHTML = '<select class="fillinp fillsel">'+
-        '<option value="">— 未选择 —</option>'+
+        '<option value="">— 请选择（'+esc(label||'')+'） —</option>'+
         opts.map(o=>'<option value="'+esc(o)+'"'+(o===curVal?' selected':'')+'>'+esc(o)+'</option>').join('')+
-        '<option value="__clear__">— 清除（置为未知） —</option>'+
       '</select>';
     } else {
       w.innerHTML = '<input class="fillinp'+(isNum?' numinp':'')+'" type="'+(isNum?'number':'text')+
@@ -1941,7 +1930,6 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
     const doSubmit = async () => {
       let val = String(inp.value || '').trim();
-      if (val === '__clear__') val = '';
       if (!val){
         if (isEdit){ toast('没有填写内容'); restore(); return; }
         restore(); return;
@@ -2926,7 +2914,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (f.type === 'select'){
         const cur = pre[f.k] || '';
         html += '<select data-k="'+f.k+'"'+(ro?' disabled':'')+'>'+
-          '<option value="">— 未选择 —</option>'+
+          '<option value="">— 请选择（'+esc(label||'')+'） —</option>'+
           f.opts.map(o=>'<option value="'+esc(o)+'"'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+
         '</select>';
       } else {
