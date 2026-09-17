@@ -332,6 +332,21 @@ tr.row-team td.teamtd{background:#f7faff}
 .chip.warnc.on{background:#fdeaea;border-color:#e57373;color:#c62828}
 .chip.infoc{border-color:#d6e4ff}
 .chip.infoc.on{background:#eef4ff;border-color:#2f6fed;color:#2f6fed}
+/* ---------- 筛选按钮悬浮说明气泡 ---------- */
+.qwrap{position:relative;display:inline-block}
+.qwrap>button{display:block}
+.qtip{position:absolute;left:0;top:calc(100% + 9px);z-index:60;width:296px;box-sizing:border-box;
+  background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  box-shadow:0 8px 26px rgba(15,23,42,.14);font-size:12px;line-height:1.68;color:var(--tx2);
+  font-weight:400;text-align:left;white-space:normal;opacity:0;visibility:hidden;
+  transform:translateY(-4px);transition:opacity .15s,transform .15s,visibility .15s;pointer-events:none}
+.qtip::before{content://;position:absolute;top:-6px;left:16px;width:10px;height:10px;
+  background:#fff;border-left:1px solid var(--line);border-top:1px solid var(--line);transform:rotate(45deg)}
+.qtip b{display:block;color:var(--tx);font-size:12.5px;margin-bottom:5px;font-weight:700}
+.qtip .qrow{display:flex;gap:6px;margin-top:4px}
+.qtip .qk{flex:0 0 auto;color:var(--tx3)}
+.qtip .qv{flex:1;color:var(--tx2)}
+.qwrap:hover .qtip{opacity:1;visibility:visible;transform:translateY(0)}
 td.addr{min-width:220px;max-width:340px;color:var(--tx2);font-size:12.5px;white-space:normal}
 td.uid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--tx2);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr.mark-row{background:#fffaf7}
@@ -495,8 +510,25 @@ tr.mark-row:hover{background:#fff5f0}
       <div class="fdiv"></div>
       <div class="fgroup">
         <label>标记</label>
-        <button class="chip warnc" id="fAbn">只看异常达人</button>
-        <button class="chip infoc" id="fTeam">只看团标识</button>
+        <span class="qwrap">
+          <button class="chip warnc" id="fAbn">只看异常达人</button>
+          <span class="qtip">
+            <b>只看异常达人</b>
+            筛选出已被标记为「异常」的达人，便于集中跟进、核实或清理。
+            <span class="qrow"><span class="qk">标记方式：</span><span class="qv">在表格「异常」列点「+ 异常」给该达人打标</span></span>
+            <span class="qrow"><span class="qk">注意：</span><span class="qv">异常标记<b style="display:inline;color:#c62828">只能加、不能删</b>，云端触发器保护，请确认后再点</span></span>
+          </span>
+        </span>
+        <span class="qwrap">
+          <button class="chip infoc" id="fTeam">只看团标识</button>
+          <span class="qtip">
+            <b>只看团标识</b>
+            筛选出疑似「团」的达人 —— 即联系方式被多个达人共用的情况。
+            <span class="qrow"><span class="qk">判定规则：</span><span class="qv">同一个<b style="display:inline">收货人</b>或<b style="display:inline">手机号</b>被 ≥ 3 位不同达人共用，自动打上 👥 团标识</span></span>
+            <span class="qrow"><span class="qk">为什么：</span><span class="qv">多个达人收货信息指向同一人，通常是 MCN / 团长 / 内部团统一代收</span></span>
+            <span class="qrow"><span class="qk">说明：</span><span class="qv">「王女士」「李先生」这类通用称呼已排除，不参与统计</span></span>
+          </span>
+        </span>
       </div>
     </div>
     <div class="frow" style="margin-top:10px">
