@@ -2635,7 +2635,11 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     merge: mergeIntoRow,
     coop: guessCoop,
     cate: guessCate,
-    track: guessTrack
+    track: guessTrack,
+    cleanNick: cleanNickBrackets,
+    noise: isNoiseLine,
+    platStrict: guessPlatformStrict,
+    addr: parseAddrBlock
   };
 
   // 无结果时的两个动作（事件委托，因为按钮是动态生成的）
@@ -3441,6 +3445,20 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     for (const [re, name] of PLAT_ALIAS){ if (re.test(t)) return name; }
     return '';
   }
+  // 严格版：整值精确匹配，禁止子串误伤
+  //   ⚠️ 旧版用子串 test，「快递单号」的「快」会被判成快手平台 → 必须用这个
+  function guessPlatformStrict(s){
+    const t = String(s||'').trim();
+    if (!t) return '';
+    if (/^(?:未知|无|不限|其他|其它)$/.test(t)) return '';
+    if (/^(?:抖音|douyin|dy|抖)$/i.test(t))            return '抖音';
+    if (/^(?:快手|kuaishou|ks|快)$/i.test(t))          return '快手';
+    if (/^(?:小红书|redbook|xhs)$/i.test(t))           return '小红书';
+    if (/^(?:视频号|sph|channels)$/i.test(t))          return '视频号';
+    if (/^(?:淘宝|taobao|tb|淘)$/i.test(t))            return '淘宝';
+    if (/^(?:b站|bilibili|哔哩)$/i.test(t))            return 'B站';
+    return '';
+  }
   // 带货类型关键词（只在值本身就是「短/直/视频为主/直播为主」时命中）
   function guessCtype(s){
     const t = String(s||'').trim();
@@ -3532,6 +3550,62 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   const isCateWord  = s => CATE_WORDS.indexOf(String(s||'').trim()) >= 0;
   const isTrackWord = s => TRACK_WORDS.indexOf(String(s||'').trim().toLowerCase()) >= 0;
 
+  // ---------- 噪声行识别（事务描述，不含达人信息 → 整行丢弃） ----------
+  //  用户诉求：「帮忙双账号专属」「发一下手卡、物料」「发出给一下快递单号」都不该当昵称
+  //  安全阀：行内含达人信息关键词时一律不判噪声，避免误杀
+  const NOISE_KEEP = /uid|平台|达人|昵称|博主|微信|vx|v信|电话|手机|收货|地址|姓名|联系人|粉丝|等级|类目|合作/i;
+  const NOISE_PAT = [
+    /^(?:帮忙|帮|请|麻烦|辛苦)/,
+    /发一下|发给一下|发我|发下|发布一下|寄一下|安排一下/,
+    /快递单号|运单号|物流单号|单号/,
+    /手卡|物料|样品|资料|素材/,
+    /^谢谢|^感谢|^收到|^好的|^行|^ok$/i,
+    /^(?:求|需要|麻烦)/,
+    /有没有|能不能|可不可以/
+  ];
+  function isNoiseLine(raw){
+    const t = String(raw||'').trim();
+    if (!t) return true;
+    // 含达人信息关键词 → 绝不判噪声
+    if (NOISE_KEEP.test(t)) return false;
+    // 带序号的事务条目：「2、发一下…」「3、发出给一下…」
+    if (/^(?:[①②③④⑤⑥⑦⑧⑨⑩]|[（(]?\d{1,2}[)）.、])\s*\S/.test(t)) {
+      // 序号 + 动作词 → 噪声；序号 + 纯信息 → 不判（交给后续规则）
+      const body = t.replace(/^[\s\u3000]*(?:[①②③④⑤⑥⑦⑧⑨⑩]|[（(]?\d{1,2}[)）.、])\s*/, '');
+      if (NOISE_PAT.some(re => re.test(body))) return true;
+    }
+    if (NOISE_PAT.some(re => re.test(t))) return true;
+    return false;
+  }
+
+  // ---------- 「昵称 + uid」贴在一起的写法 ----------
+  //  例：「宏君子兰uid:2327037080506125」「君子兰uid 81718274193」
+  //  特征：中文名 + uid（大小写不限）+ 可选冒号 + 数字
+  const RE_GLUED_UID = /^(.+?)\s*[uU][iI][dD]\s*[:：]?\s*(\d{8,20})$/;
+  //  用户定：只要数字前面明确出现过 uid，就是 UID（哪怕只有 11 位）
+  //  —— 不再按位数改判达人号
+
+  // ---------- 地址块解析 ----------
+  //  例：「地址：蒋生,18229118811 上海 上海市 青浦区 盈浦街道西虹桥壹号新塘港路1199弄」
+  const RE_ADDR_LINE = /^(?:地址|收货地址|收件地址|收货信息|收件信息)\s*[:：]\s*(.+)$/;
+  function parseAddrBlock(s){
+    let rest = String(s||'').trim();
+    if (!rest) return null;
+    // 1) 抓 11 位手机号
+    const pm = rest.match(/1[3-9]\d{9}/);
+    const phone = pm ? pm[0] : '';
+    if (phone) rest = rest.replace(phone, ' ');
+    // 2) 抓收货人：手机号前的 2–6 位中文，或行首中文名
+    let receiver = '';
+    const rm = rest.match(/^[\s,，、;；]*([\u4e00-\u9fa5]{2,6})[\s,，、;；]*$/m) ||
+               rest.match(/^[\s,，、;；]*([\u4e00-\u9fa5]{2,6})[\s,，、;；]+/);
+    if (rm){ receiver = rm[1]; rest = rest.replace(receiver, ' '); }
+    // 3) 剩余当地址；合并「上海 上海市」这类省市重复
+    let address = rest.replace(/[\s,，、;；]+/g, ' ').trim();
+    address = address.replace(/^([\u4e00-\u9fa5]{2,4})\s+\1(?:市|省|区)/, '$1');
+    return { receiver, phone, address };
+  }
+
   // ---------- 主解析函数 ----------
   //  返回：{ entries:[{nickname,wx1,wx2,wx3,phone,platform,handle,uid,clevel,ctype,track,cate,coop}], raw }
   function parsePaste(text){
@@ -3540,7 +3614,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     const entries = [];
     let cur = null;
 
-    const ensure = () => { if (!cur){ cur = { nickname:'', wx1:'', wx2:'', wx3:'', phone:'', platform:'', handle:'', uid:'', clevel:'', ctype:'', track:'', cate:'', coop:'' }; entries.push(cur); } return cur; };
+    const ensure = () => { if (!cur){ cur = { nickname:'', wx1:'', wx2:'', wx3:'', phone:'', platform:'', handle:'', uid:'', clevel:'', ctype:'', track:'', cate:'', coop:'', receiver:'', address:'' }; entries.push(cur); } return cur; };
 
     // 把「值」按类型放进当前条目
     const put = (o, key, val, force) => {
@@ -3550,11 +3624,16 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (key === 'wx') key = '';
       // 显式指定了槽位（微信2 / 微信3）→ 直接落位，不做形态推断
       if (key === 'wx2' || key === 'wx3'){ if (!o[key]) o[key] = val; return; }
-      if (key === 'platform'){ const p = guessPlatform(val) || val; o.platform = o.platform || p; return; }
+      if (key === 'platform'){ const p = guessPlatformStrict(val) || guessPlatform(val) || val; o.platform = o.platform || p; return; }
       if (key === 'ctype'){ const c = guessCtype(val) || val; o.ctype = o.ctype || c; return; }
       if (key === 'clevel'){ const m = val.match(/([1-8])/); if (m) o.clevel = o.clevel || ('L'+m[1]); return; }
       if (key === 'phone'){ const p = val.replace(/[\s-]/g,''); o.phone = o.phone || p; return; }
-      if (key === 'nickname'){ o.nickname = o.nickname || val; return; }
+      if (key === 'nickname'){
+        // 带标注词（「达人昵称：」）→ hasLabel=true，纯中文名括号会连符号一起保留
+        const c = cleanNickBrackets(val, !!force);
+        o.nickname = o.nickname || c.name;
+        return;
+      }
       if (key === 'handle'){ o.handle = o.handle || val; return; }
       if (key === 'uid'){ o.uid = o.uid || val; return; }
       if (key === 'track' || key === 'cate' || key === 'coop'){
@@ -3595,6 +3674,50 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
     for (const rawLine of lines){
       let line = rawLine;
+      // 噪声行（「帮忙双账号专属」「发一下手卡、物料」「发出给一下快递单号」）→ 整行丢弃
+      if (isNoiseLine(line)) continue;
+
+      // 地址块：「地址：蒋生,18229118811 上海 上海市 青浦区…」→ 收货人/手机号/地址
+      {
+        const al = stripNo(line);
+        const am = al.match(RE_ADDR_LINE);
+        if (am){
+          const p = parseAddrBlock(am[1]);
+          if (p){
+            // 用户定：一段地址出现在多条达人之后时，两条都要写
+            //  （达人开多个号、共用一个收货地址 → 每条都补上）
+            const targets = entries.length ? entries : [ensure()];
+            targets.forEach(o => {
+              if (p.receiver) o.receiver = o.receiver || p.receiver;
+              if (p.phone)    o.phone    = o.phone    || p.phone;
+              if (p.address)  o.address  = o.address  || p.address;
+            });
+            continue;
+          }
+        }
+      }
+
+      // 「昵称 + uid」贴在一起：「宏君子兰uid:2327037080506125」「君子兰uid 81718274193」
+      //   用户定：数字前明确出现 uid → 就是 UID，不按位数改判
+      {
+        const gl = stripNo(line);
+        const gm = gl.match(RE_GLUED_UID);
+        if (gm){
+          const nm = cleanNickBrackets(gm[1], false).name;
+          // 与上一条同名 → 直接补 UID；否则新开一条
+          const prev = entries[entries.length - 1];
+          if (prev && prev.nickname && nm && normalizeSame(prev.nickname) === normalizeSame(nm) && !prev.uid){
+            prev.uid = prev.uid || gm[2];
+            continue;
+          }
+          if (cur && (cur.nickname || cur.uid)) cur = null;
+          const o = ensure();
+          if (nm) o.nickname = o.nickname || nm;
+          o.uid = o.uid || gm[2];
+          continue;
+        }
+      }
+
       // 一行里可能塞了多段（①②③…）→ 先按编号切开
       //  「①平台：视频号 ②达人：xxx ③微信：yyy」→ 三段
       const segs = line.split(/(?=[①②③④⑤⑥⑦⑧⑨⑩])/).map(x=>x.trim()).filter(Boolean);
@@ -3605,7 +3728,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
           if (m){
             const k = pasteLabelKey(m[1]);
             if (k === 'nickname' || k === 'platform' || k === 'wx' || k === 'phone') ensure();
-            put(ensure(), k, m[2].trim());
+            put(ensure(), k, m[2].trim(), k === 'nickname');   // 带标注 → 括号可能需保留
           } else {
             put(ensure(), '', s2);
           }
@@ -3637,7 +3760,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
           if ((cur_.key === 'nickname' || cur_.key === 'platform') && cur && (cur.nickname || cur.wx1 || cur.phone)){
             cur = null;
           }
-          put(ensure(), cur_.key, val);
+          put(ensure(), cur_.key, val, cur_.key === 'nickname');
         }
         continue;
       }
@@ -3655,7 +3778,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             if (cp.clevel   && !o.clevel)   o.clevel   = cp.clevel;
             continue;
           }
-          const pf = guessPlatform(p);
+          const pf = guessPlatformStrict(p);
           const ct = guessCtype(p);
           if (pf && !o.platform){ o.platform = pf; if (ct && !o.ctype) o.ctype = ct; continue; }
           if (ct && !o.ctype){ o.ctype = ct; continue; }
@@ -3673,7 +3796,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         if (cp1.clevel   && !o.clevel)   o.clevel   = cp1.clevel;
         continue;
       }
-      const pf = guessPlatform(s1), ct = guessCtype(s1);
+      const pf = guessPlatformStrict(s1), ct = guessCtype(s1);
       if (pf && !o.platform){ o.platform = pf; if (ct && !o.ctype) o.ctype = ct; continue; }
       if (ct && !o.ctype){ o.ctype = ct; continue; }
       put(o, '', s1);
@@ -3687,6 +3810,71 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   //  用户要求：表情、特殊符号、括号内容不一样的 → 视为同一人
   //    「何大厨说味道」 vs 「何大厨说味道（官方）」 → 同一人
   //    「高娜丽美食记」 vs 「高娜丽美食记🍜」        → 同一人
+  // ---------- 昵称括号清洗（用户定规则） ----------
+  //  判据：括号里的内容「会不会变」
+  //   ① 日期/场次/活动/促销（会变）        → 删掉整个括号
+  //        晨小安（8月29日生日场） → 晨小安
+  //   ② 纯中文名 2–6 字（是主名称）         → 保留内容
+  //        XXXX（晨小安）        → 晨小安      （无标注词，去括号符号）
+  //        达人昵称：（晨小安）    → （晨小安）   （有标注词，连括号一起留）
+  //   ③ 其他（小号名/业务描述，不会变）      → 括号+内容全保留
+  //        吴优雅(悠雅形体礼仪2号） → 原样
+  //   ④ 认不准                             → 原样（安全兜底，绝不擅自删信息）
+  const BRACKET_RE = /[（(]\s*([^（()）]*?)\s*[)）]/g;
+
+  // ① 临时信息：日期 / 场次 / 活动 / 促销
+  const TEMP_WORDS = /生日场|专场|直播|首播|返场|场次|福利|秒杀|大促|回馈|开播|预告|预告场|活动|特辑|抽奖|宠粉|宠粉场|新号|福利场/;
+  const TEMP_DATE  = /\d{1,2}\s*[月.\-/]\s*\d{1,2}\s*[日号]?|今晚|明天|今天|后天|周[一二三四五六日天]|下周|本周|\d{1,2}:\d{2}|\d{1,2}点/;
+
+  function isTempBracket(inner){
+    const t = String(inner||'').trim();
+    if (!t) return true;
+    return TEMP_WORDS.test(t) || TEMP_DATE.test(t);
+  }
+  // ② 纯中文名 2–6 字
+  function isPureCnName(inner){
+    const t = String(inner||'').trim();
+    return /^[\u4e00-\u9fa5]{2,6}$/.test(t);
+  }
+
+  // 清洗昵称：返回 { name, changed }
+  //  hasLabel = 该昵称前面是否有明确标注词（达人昵称：/账号：…）
+  function cleanNickBrackets(raw, hasLabel){
+    let s = String(raw||'').trim();
+    if (!s) return { name: s, changed: false };
+    const orig = s;
+    // 0) 先剥掉显式标注前缀（「达人昵称：」「账号：」…）
+    //    带标注时也剥，但下面保留括号符号
+    s = s.replace(/^(?:达人?昵称|博主名|博主|达人名称|达人名|达人号|账号名称|账户名|账号|昵称|姓名|名字)\s*[:：]\s*/, '');
+    // 逐个括号处理
+    let usedInnerOnly = false;
+    s = s.replace(BRACKET_RE, (full, inner) => {
+      if (isTempBracket(inner)) return '';                 // ① 临时 → 整个删掉
+      if (isPureCnName(inner)) {                            // ② 纯中文名 → 留内容
+        if (hasLabel) return full;
+        usedInnerOnly = true;
+        return inner;
+      }
+      return full;                                          // ③④ 其他/认不准 → 原样
+    });
+    // 清理残留：括号删掉后可能出现「名称 」或「 名称」，以及连续空格
+    s = s.replace(/[\s\u3000]{2,}/g, ' ').trim();
+    // 情况②「XXXX（晨小安）」→ 括号外是无效残留，只留括号内那个名字
+    if (usedInnerOnly && !hasLabel){
+      const parts = s.split(/\s+/).filter(Boolean);
+      if (parts.length > 1){
+        const cn = parts.filter(p => /^[\u4e00-\u9fa5]{2,10}$/.test(p));
+        if (cn.length === 1) s = cn[0];
+      } else if (parts.length === 1 && !/^[\u4e00-\u9fa5]{2,10}$/.test(parts[0])) {
+        // 形如「XXXX晨小安」——无分隔符粘连。取尾部连续中文段
+        const m = s.match(/([\u4e00-\u9fa5]{2,10})$/);
+        if (m) s = m[1];
+      }
+    }
+    s = s.replace(/^[\s,，、;；\-_]+|[\s,，、;；\-_]+$/g, '').trim();
+    return { name: s || orig, changed: s !== orig };
+  }
+
   function normNickBase(s){
     return String(s||'')
       .replace(/[（(【\[].*?[)）】\]]/g,'')        // 去掉括号及其内容
@@ -3695,6 +3883,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       .replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'')     // 只留中英文数字
       .toLowerCase();
   }
+  // 同人比对用的昵称归一（与 normNickBase 同义，供解析期内联调用）
+  const normalizeSame = normNickBase;
   // 在已有数据里找同一个人
   //  返回命中的行 r，或 null
   function findSameCreator(nick, wxList, phone){
@@ -3737,6 +3927,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     }
     // 手机号
     if (e.phone && !String(r[12]||'').trim()){ r[12] = e.phone; filled.push('手机号=' + e.phone); }
+    // 收货人 / 收货地址（只补空）
+    if (e.receiver && !String(r[11]||'').trim()){ r[11] = e.receiver; filled.push('收货人=' + e.receiver); }
+    if (e.address && !String(r[13]||'').trim()){ r[13] = e.address; filled.push('地址=' + e.address); }
     // 其它字段：只填空
     const mapOther = [[14,'track',e.track],[15,'cate',e.cate],[16,'coop',e.coop]];
     if (e.platform && !String(r[0]||'').trim()){ r[0] = e.platform; filled.push('平台=' + e.platform); }
@@ -3854,6 +4047,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             if (String(hit[9]||'').trim()) patch.wx2 = hit[9];
             if (String(hit[10]||'').trim()) patch.wx3 = hit[10];
             if (String(hit[12]||'').trim()) patch.phone = hit[12];
+            if (String(hit[11]||'').trim()) patch.receiver = hit[11];
+            if (String(hit[13]||'').trim()) patch.address = hit[13];
             if (String(hit[0]||'').trim())  patch.platform = hit[0];
             if (String(hit[2]||'').trim())  patch.handle = hit[2];
             // 枚举型增量列（赛道/类目/合作类型）—— 之前漏了，导致并入时这几列不同步到云端
@@ -3897,7 +4092,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         row[8]  = e.wx1 || '';
         row[9]  = e.wx2 || '';
         row[10] = e.wx3 || '';
+        row[11] = e.receiver || '';
         row[12] = e.phone || '';
+        row[13] = e.address || '';
         row[14] = e.track || '';
         row[15] = e.cate || '';
         row[16] = e.coop || '';
@@ -3909,7 +4106,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             platform: row[0]||null, nickname: row[1]||'', handle: row[2]||null, uid: row[3]||null,
             ctype: row[5]||null, clevel: row[6]||null,
             wx1: row[8]||null, wx2: row[9]||null, wx3: row[10]||null,
-            phone: row[12]||null,
+            receiver: row[11]||null, phone: row[12]||null, address: row[13]||null,
             // 枚举型增量列 —— 之前漏了，导致新建时赛道/类目/合作类型没写进云端
             track: row[14]||null, cate: row[15]||null, coop: row[16]||null,
             editor:'2517', source:'paste'
