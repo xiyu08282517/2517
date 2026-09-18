@@ -177,6 +177,27 @@ select:focus,.numin:focus{border-color:var(--brand)}
 .impmap .colname{font-family:ui-monospace,Consolas,monospace;color:var(--tx2)}
 .impmap .hit{color:var(--ok);font-size:11px;font-weight:600}
 .impmap .miss{color:var(--tx3);font-size:11px}
+/* 复合列名（抖短3 → 抖音/视频为主/L3） */
+.impmap tr.cprow{background:#f4f9ff}
+.impmap tr.cprow .colname{color:var(--blue);font-weight:600}
+.impmap .cpbadge{display:inline-block;background:#e6f1ff;color:#0b5cad;border:1px solid #c7e0ff;
+  border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600;line-height:1.4}
+
+/* ---------- 快捷粘贴录入 ---------- */
+.pastebox{width:100%;min-height:190px;max-height:340px;border:1.5px solid var(--line);border-radius:10px;
+  padding:12px 14px;font-size:13.5px;font-family:ui-monospace,Consolas,'Microsoft YaHei',monospace;
+  line-height:1.85;outline:none;resize:vertical;background:#fff;color:var(--tx)}
+.pastebox:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brandbg)}
+.pastebox::placeholder{color:#b6bcc6;font-size:12.5px}
+.pasteprev{margin-top:14px}
+.pasteprev .badge-new{background:#e8f5ec;color:#0b7a3d;border:1px solid #cfe9d8;
+  border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
+.pasteprev .badge-merge{background:#fff4e0;color:#8a5a08;border:1px solid #f0dcb8;
+  border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
+.pasteprev .badge-skip{background:#f2f3f5;color:var(--tx3);border:1px solid var(--line2);
+  border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
+.mnote code{background:#fff;border:1px solid #d6e4ff;border-radius:5px;padding:1px 6px;
+  font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#2b5cbf;white-space:nowrap}
 .impprev{overflow:auto;max-height:250px;border:1px solid var(--line);border-radius:9px}
 .impprev table{border-collapse:collapse;font-size:12px;min-width:100%}
 .impprev th{background:#f7f8fa;color:var(--tx2);font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
@@ -425,6 +446,7 @@ tr.mark-row:hover{background:#fff5f0}
       <button class="clr" id="clr" title="清空">✕</button>
     </div>
     <button class="btn" id="reset">重置</button>
+    <button class="btn primary" id="pasteBtn" title="把聊天里复制的内容直接粘进来，自动识别">⚡ 快捷粘贴</button>
     <button class="btn" id="newBtn">+ 录入达人</button>
     <button class="btn" id="impBtn">⇪ 导入表格</button>
     <button class="btn primary" id="exportBtn">导出结果</button>
@@ -596,7 +618,6 @@ tr.mark-row:hover{background:#fff5f0}
       <ul class="nlist">
         <li>如果遇到<b>信息不全</b>的内容，请你<b>手动补齐</b>，方便大家，共创佳绩。</li>
         <li><b>双击内容</b>即复制该内容，<b>双击本行</b>即复制本行内容。</li>
-        <li>鼠标<b>悬停</b>在内容上会弹出小菜单，可选择 <b>⧉ 复制</b> 或 <b>✎ 修改</b>；菜单显示在内容下方，不会挡住内容。</li>
         <li>如果需要联系管理员，请添加 <b class="nwx" data-copy="Aries161130" title="点击复制微信号">Aries161130</b> <span class="ncopy">点击复制</span></li>
       </ul>
     </div>
@@ -849,6 +870,54 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   };
   // 数值型字段（提交时转 Number）
   const NUM_FIELDS = {fans:1, sales:1};
+
+  // ---------- 字段内容校验（提交前拦脏数据） ----------
+  //  目的：几万条数据里混进了大量「键盘乱敲 / 占位 / 把抖音号填进微信号栏」的脏值，
+  //        人工查不过来。这里在录入/修改的瞬间就拦下，源头止污。
+  //  规则来源（用户 2026-09-18 确认）：
+  //    微信号：6–20 位；不能以数字开头（字母、下划线、减号开头都合法）；仅字母/数字/_/-
+  //    手机号：11 位，1 开头，纯数字
+  const WX_RE    = /^[^0-9][A-Za-z0-9_-]{5,19}$/;   // 首字符任意非数字；总长 6–20
+  const PHONE_RE = /^1\d{10}$/;
+
+  // 微信号校验：返回 {ok:true} 或 {ok:false, why:'原因'}
+  function checkWx(v){
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return { ok:true };                       // 空 = 未知，合法
+    if (/[\u4e00-\u9fa5]/.test(s)) return { ok:false, why:'不能含中文' };
+    if (/\s/.test(s))              return { ok:false, why:'不能含空格' };
+    if (s.length < 6)              return { ok:false, why:'至少 6 位，现在只有 '+s.length+' 位' };
+    if (s.length > 20)             return { ok:false, why:'最多 20 位，现在有 '+s.length+' 位' };
+    if (/[^A-Za-z0-9_-]/.test(s)) {
+      const bad = s.match(/[^A-Za-z0-9_-]/g);
+      return { ok:false, why:'只能含字母、数字、下划线、减号（检测到「'+bad[0]+'」）' };
+    }
+    if (/^\d/.test(s))             return { ok:false, why:'不能以数字开头' };
+    return { ok:true };
+  }
+
+  // 手机号校验：合法则返回 {ok:true}；「主号 / 备用号」双号格式也放行并给出拆分结果
+  function checkPhone(v){
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return { ok:true };
+    // 双号：允许用 / 、 , ; 空格 等分隔，如「13713391604 / 15145795769」
+    const parts = s.split(/[\/、,;，；\s]+/).filter(Boolean);
+    if (parts.length === 2){
+      const bad = parts.filter(p => !PHONE_RE.test(p));
+      if (!bad.length) return { ok:true, split:[parts[0], parts[1]] };
+      return { ok:false, why:'备用号「'+bad[0]+'」不是 11 位手机号' };
+    }
+    if (parts.length > 2) return { ok:false, why:'最多填 2 个号码' };
+    if (/[\u4e00-\u9fa5]/.test(s)) return { ok:false, why:'不能含中文' };
+    if (!/^\d+$/.test(s))          return { ok:false, why:'只能是数字' };
+    if (!/^1/.test(s))             return { ok:false, why:'必须以 1 开头' };
+    if (s.length !== 11)           return { ok:false, why:'必须是 11 位，现在有 '+s.length+' 位' };
+    return { ok:true };
+  }
+
+  // 字段 → 校验器（未列出的字段不校验）
+  const VALIDATORS = { wx1:checkWx, wx2:checkWx, wx3:checkWx, phone:checkPhone };
+
   // 字段 → 中文名（用于提示文案）
   const FIELD_CN = {
     platform:'平台', handle:'达人号', fans:'粉丝数', ctype:'带货类型', clevel:'带货等级',
@@ -1965,32 +2034,33 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
     const isBlank = !!wrap.querySelector('.unkfill');
     const tip = el('span','edittip');
-    const bCopy = el('button','tipCopy', '⧉ 复制');
-    const bEdit = el('button','tipEdit', isBlank ? '＋ 填写' : '✎ 修改');
-    tip.appendChild(bCopy);
+    // 空白格（内容为「未知」）只给「＋ 补充」一个入口 —— 没内容可复制，也不该出现「复制」误导操作
+    if (!isBlank){
+      const bCopy = el('button','tipCopy', '⧉ 复制');
+      tip.appendChild(bCopy);
+      bCopy.addEventListener('click', async ev=>{
+        ev.preventDefault(); ev.stopPropagation();
+        const raw = wrap.getAttribute('data-copy');
+        const tr  = wrap.closest('tr[data-rowcopy]');
+        if (raw != null && String(raw).trim()){
+          const val = String(raw).trim();
+          const ok = await copyText(val);
+          flashCopied(wrap);
+          if (ok) toast('已复制：'+(val.length>26 ? val.slice(0,26)+'…' : val));
+          else toast('复制失败，请长按/右键选择复制','err');
+        } else if (tr && tr.dataset.rowcopy){
+          const ok = await copyText(tr.dataset.rowcopy);
+          flashCopied(wrap);
+          if (ok) toast('已复制该达人全部信息（'+tr.dataset.rowcopy.split('\n').length+' 项）');
+          else toast('复制失败，请长按/右键选择复制','err');
+        } else {
+          toast('该格没有可复制的内容');
+        }
+        hideTool();
+      });
+    }
+    const bEdit = el('button','tipEdit', isBlank ? '＋ 补充' : '✎ 修改');
     tip.appendChild(bEdit);
-
-    // 复制：优先取本格的原始值；空格子（data-copy=""）退化为复制整行
-    bCopy.addEventListener('click', async ev=>{
-      ev.preventDefault(); ev.stopPropagation();
-      const raw = wrap.getAttribute('data-copy');
-      const tr  = wrap.closest('tr[data-rowcopy]');
-      if (raw != null && String(raw).trim()){
-        const val = String(raw).trim();
-        const ok = await copyText(val);
-        flashCopied(wrap);
-        if (ok) toast('已复制：'+(val.length>26 ? val.slice(0,26)+'…' : val));
-        else toast('复制失败，请长按/右键选择复制','err');
-      } else if (tr && tr.dataset.rowcopy){
-        const ok = await copyText(tr.dataset.rowcopy);
-        flashCopied(wrap);
-        if (ok) toast('已复制该达人全部信息（'+tr.dataset.rowcopy.split('\n').length+' 项）');
-        else toast('复制失败，请长按/右键选择复制','err');
-      } else {
-        toast('该格没有可复制的内容');
-      }
-      hideTool();
-    });
     // 修改：进入编辑态
     bEdit.addEventListener('click', ev=>{
       ev.preventDefault(); ev.stopPropagation();
@@ -2089,10 +2159,12 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       w.innerHTML = '<select class="fillinp fillsel">'+
         '<option value="">— 请选择（'+esc(label||'')+'） —</option>'+
         opts.map(o=>'<option value="'+esc(o)+'"'+(o===curVal?' selected':'')+'>'+esc(o)+'</option>').join('')+
+        // 下拉字段也允许置回未知：选它就等于清空
+        (isEdit ? '<option value="'+esc(UNK)+'">'+esc(UNK)+'（清空该字段）</option>' : '')+
       '</select>';
     } else {
       w.innerHTML = '<input class="fillinp'+(isNum?' numinp':'')+'" type="'+(isNum?'number':'text')+
-                    '" value="'+esc(curVal)+'" placeholder="输入'+esc(label)+'，回车提交" />';
+                    '" value="'+esc(curVal)+'" placeholder="'+(isEdit ? '输入'+esc(label)+'，回车提交（留空=置为未知）' : '输入'+esc(label)+'，回车提交')+'" />';
     }
     const inp = w.querySelector('.fillinp');
     const isSel = inp.tagName === 'SELECT';
@@ -2113,9 +2185,19 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
     const doSubmit = async () => {
       let val = String(inp.value || '').trim();
+      // 用户输入「未知」等同于清空 —— 两者都表示「置为未知」，避免把字面量「未知」写进云端
+      if (val === UNK) val = '';
+
       if (!val){
-        if (isEdit){ toast('没有填写内容'); restore(); return; }
-        restore(); return;
+        // 清空：
+        //   原本就是空的 → 无事可做，还原即可
+        //   原本有值     → 视为「置为未知」，需要真正提交（写 null），否则用户以为改掉了其实没动
+        if (!isEdit){ restore(); return; }
+        if (!confirm('确定把「'+(r[1]||'该达人')+'」的'+label+'清空、置为「未知」吗？\n\n原值：'+curVal+'\n\n⚠️ 修改后所有打开本页的人都会看到，请确认无误。')) {
+          inp.focus(); inp.select(); return;
+        }
+        await submitValue(null, '已清空');
+        return;
       }
       if (val === curVal){ restore(); return; }
 
@@ -2126,67 +2208,123 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         val = n;
       }
 
+      // 内容格式校验（微信号 / 手机号）——把脏数据拦在源头
+      const vd = VALIDATORS[field];
+      if (vd){
+        const res = vd(val);
+        if (!res.ok){
+          toast('「'+label+'」格式不对：'+res.why, 'err');
+          inp.focus(); inp.select(); return;
+        }
+        // 手机号双号格式「主号 / 备用号」→ 自动拆分，主号存本栏，备用号存进备注列（address）
+        if (res.split){
+          const extra = res.split[1];
+          const oldAddr = String(r[13]||'').trim();
+          if (!oldAddr.includes(extra)){
+            r[13] = oldAddr ? (oldAddr + '　备用号：' + extra) : ('备用号：' + extra);
+          }
+          val = res.split[0];
+          toast('已识别双号，备用号 '+extra+' 存入收货地址栏');
+        }
+      }
+
       // 修改已有值 → 二次确认
       if (isEdit){
         if (!confirm('确定把「'+(r[1]||'该达人')+'」的'+label+'改成：\n\n'+val+'\n\n原值：'+curVal+'\n\n⚠️ 修改后所有打开本页的人都会看到新值，请确认无误。')) {
           inp.focus(); inp.select(); return;
         }
       }
+      await submitValue(val, isEdit ? '已修改' : '已补充');
+    };
 
+    // 统一的提交逻辑：val 为 null / '' 表示「置为未知」
+    const submitValue = async (val, doneWord) => {
+      const isClear = (val == null || val === '');
+      const sendVal = isClear ? null : val;
       inp.disabled = true;
       inp.placeholder = '提交中…';
 
       const patch = {};
-      patch[field] = val;
+      patch[field] = sendVal;
 
       try{
         if (!isCfgOk()) throw new Error('云端未配置');
         let okCloud = false;
 
-        if (r.__id != null){
-          await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(r.__id), {method:'PATCH', body:patch});
+        // __id 必须是「有效主键」才算数。
+        // 踩过的坑：__id 可能是 undefined / null / 空串 / NaN —— 早期写法只判 != null，
+        // 于是拼出 ?id=eq.undefined，命中 0 行；而网关对「0 行命中」仍返回 200，
+        // 结果就是「提示写成功、云端其实没动」。这里必须先验住。
+        const rid = r.__id;
+        const hasId = rid != null && rid !== '' && String(rid) !== 'undefined' && String(rid) !== 'NaN';
+
+        if (hasId){
+          const done = await writeThenVerify('id=eq.'+encodeURIComponent(String(rid)), field, sendVal, patch);
+          if (!done) await locateAndWrite(field, sendVal, patch, isClear);
           okCloud = true;
         } else {
-          const h = String(r[2]||'').trim(), u = String(r[3]||'').trim();
-          if (!h && !u) throw new Error('该行缺少达人号与UID，无法定位');
-          const q = h ? 'handle=eq.'+encodeURIComponent(h) : 'uid=eq.'+encodeURIComponent(u);
-          const found = await cbFetch('/'+CB.table+'?'+q+'&select=id,'+field+'&limit=1');
-
-          if (Array.isArray(found) && found.length){
-            const rec = found[0];
-            const cloudVal = String(rec[field]==null?'':rec[field]).trim();
-            if (cloudVal && cloudVal !== curVal){
-              throw new Error('云端已有'+label+'「'+cloudVal+'」，不可覆盖');
-            }
-            await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(rec.id), {method:'PATCH', body:patch});
-            r.__id = rec.id;
-            okCloud = true;
-          } else {
-            const body = {
-              platform: r[0]||null, nickname: r[1]||'', handle: r[2]||null, uid: r[3]||null,
-              editor: '2517', source: 'web'
-            };
-            body[field] = val;
-            const created = await cbFetch('/'+CB.table, {method:'POST', body});
-            if (Array.isArray(created) && created.length) r.__id = created[0].id;
-            okCloud = true;
-          }
+          okCloud = await locateAndWrite(field, sendVal, patch, isClear);
         }
 
         if (okCloud !== true) throw new Error('云端写入失败');
 
-        r[idx] = val;
+        r[idx] = isClear ? '' : val;
         r.__src = 'remote';
-        toast((isEdit?'已修改':'已补充')+'「'+(r[1]||'该达人')+'」的'+label+'：'+val);
+        toast(doneWord+'「'+(r[1]||'该达人')+'」的'+label+(isClear ? '' : '：'+val));
         filling = false;
         curSession = null;
         apply();
       }catch(err){
         inp.disabled = false;
-        inp.placeholder = '输入'+label+'，回车提交';
+        inp.placeholder = '输入'+label+'，回车提交（留空=未知）';
         inp.focus(); inp.select();
         toast('提交失败：'+err.message, 'err');
       }
+    };
+
+    // 写入 + 回读校验；返回是否真的写进去了
+    //  为什么必须回读：网关对「PATCH 命中 0 行」不会报错，只看 HTTP 状态会假成功
+    //  ⚠️ PATCH 自身的异常必须往上抛，绝不能吞：
+    //     吞掉会导致「写入失败 → 被当成未校验 → 回退重试 → 再失败 → 循环」，
+    //     最后还会因为重试分支返回 true 而报出假成功（踩过坑）
+    const writeThenVerify = async (where, f, sendVal, patch) => {
+      await cbFetch('/'+CB.table+'?'+where, {method:'PATCH', body:patch});
+      return await verifyWritten(where, f, sendVal);
+    };
+
+    // 按 达人号 / UID 定位云端记录后再写
+    //  覆盖保护只拦「纯补充」（本地空、云端有值）；改值、清空都不属于补充，不能拦
+    const locateAndWrite = async (f, sendVal, patch, isClear) => {
+      const h = String(r[2]||'').trim(), u = String(r[3]||'').trim();
+      if (!h && !u) throw new Error('该行缺少达人号与UID，无法定位');
+      const q = h ? 'handle=eq.'+encodeURIComponent(h) : 'uid=eq.'+encodeURIComponent(u);
+      const found = await cbFetch('/'+CB.table+'?'+q+'&select=id,'+encodeURIComponent(f)+'&limit=1');
+
+      if (Array.isArray(found) && found.length){
+        const rec = found[0];
+        const cloudVal = String(rec[f]==null?'':rec[f]).trim();
+        if (cloudVal && !curVal && !isClear){
+          throw new Error('云端已有'+label+'「'+cloudVal+'」，不可覆盖');
+        }
+        r.__id = rec.id;                          // 回填主键，后续提交直接走 id，不再重复查
+        const done = await writeThenVerify('id=eq.'+encodeURIComponent(String(rec.id)), f, sendVal, patch);
+        if (!done) throw new Error('云端未保存成功（回读校验不通过），请重试');
+        return true;
+      }
+
+      // 云端没有这条记录：
+      //   置为未知 → 没有值可写，不必新建记录
+      //   有值     → 新建一条只带该字段的记录
+      if (!isClear){
+        const body = {
+          platform: r[0]||null, nickname: r[1]||'', handle: r[2]||null, uid: r[3]||null,
+          editor: '2517', source: 'web'
+        };
+        body[f] = sendVal;
+        const created = await cbFetch('/'+CB.table, {method:'POST', body});
+        if (Array.isArray(created) && created.length) r.__id = created[0].id;
+      }
+      return true;
     };
 
     curSession = { wrap: w, tr, idx, restore };
@@ -2459,6 +2597,38 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       }
     }catch(err){ toast('云端同步失败，已存本机'); }
   }
+
+  // 记录某个请求体是否真的「写入」了值（用于提交后的回读校验）
+  function hasValue(body, field){
+    if (!body || typeof body !== 'object') return false;
+    const v = body[field];
+    return !(v == null || String(v).trim() === '');
+  }
+
+  // 提交后再查一次云端，确认值真的落库了
+  //  原因：CloudBase 网关在 PATCH 未命中任何行时可能仍返回 200，
+  //        只看 HTTP 状态会出现「提示成功、其实没写进去」的假成功。
+  //  代价：一次 GET（几百毫秒）。写操作远少于读操作，这点开销换「所见即所得」很值。
+  async function verifyWritten(where, field, wantVal){
+    try{
+      const rows = await cbFetch('/'+CB.table+'?'+where+'&select=id,'+encodeURIComponent(field)+'&limit=1');
+      if (!Array.isArray(rows) || !rows.length) return false;
+      const got = String(rows[0][field] == null ? '' : rows[0][field]).trim();
+      const want = wantVal == null ? '' : String(wantVal).trim();
+      return got === want;
+    }catch(_){
+      return false;   // 校验请求本身失败 → 不阻断本地写入，只标记为未校验
+    }
+  }
+
+  // ---------- 测试出口（供 jsdom 验证脚本调用；生产使用无影响） ----------
+  window.__testParse = {
+    compound: parseCompoundCol,
+    paste: parsePaste,
+    normNick: normNickBase,
+    sameCreator: findSameCreator,
+    merge: mergeIntoRow
+  };
 
   // 无结果时的两个动作（事件委托，因为按钮是动态生成的）
   document.addEventListener('click', e=>{
@@ -2752,6 +2922,57 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     return '';
   }
 
+  // ============================================================
+  //  复合列名解析：把「抖短3」这类简写拆成 平台 + 带货类型 + 带货等级
+  // ============================================================
+  //  用户的实际命名习惯（2026-09-18 确认）：
+  //    抖   = 抖音
+  //    短   = 视频为主（短视频）
+  //    直   = 直播为主
+  //    末尾单个数字 = 带货等级，3 → L3
+  //  变体：抖短 / 抖直 / 抖短3 / 抖直5 / 快直2 / 视频号短1 …
+  //  说明：这类列名 autoMatch 认不出来（不是标准字段名），但列里的值是达人数据，
+  //        必须先把它翻译成三个独立字段再走正常映射，否则整列会被当成「未识别」丢掉。
+  const PLAT_ALIAS = [
+    [/抖|dy|douyin/i,        '抖音'],
+    [/快|ks|kuaishou/i,      '快手'],
+    [/小红书|xhs|redbook/i,  '小红书'],
+    [/视频号|sph|channels/i, '视频号'],
+    [/淘|tb|taobao/i,        '淘宝'],
+    [/b站|bilibili|哔哩/i,    'B站']
+  ];
+  const CTYPE_ALIAS = [
+    [/直|直播|zhibo|live/i,  '直播为主'],
+    [/短|视频|shipin|video/i,'视频为主'],
+    [/视直|一体/i,           '视直一体'],
+    [/橱窗|chuang/i,         '橱窗'],
+    [/种草|zhongcao/i,       '种草']
+  ];
+  // 解析复合列名 → {platform, ctype, clevel} （识别不出的部分为 null）
+  function parseCompoundCol(rawName){
+    const s = String(rawName || '')
+      .replace(/[\s\u3000]/g, '')
+      .replace(/[（(].*?[)）]/g, '');
+    if (!s) return null;
+    // 必须含「平台标识」才算复合列名，避免把「达人」这类普通列名误判
+    let plat = null;
+    for (const [re, name] of PLAT_ALIAS){ if (re.test(s)){ plat = name; break; } }
+    if (!plat) return null;
+    let ctype = null;
+    for (const [re, name] of CTYPE_ALIAS){ if (re.test(s)){ ctype = name; break; } }
+    // 等级：列名里单独的 1–8 数字（L8 封顶）。注意要排除「抖3」以外的干扰
+    const lvM = s.match(/(?:^|[^\d])([1-8])(?:$|[^\d])/);
+    const clevel = lvM ? ('L' + lvM[1]) : null;
+    // 至少识别出平台 + （类型 或 等级）才认为是复合列名
+    if (!ctype && !clevel) return null;
+    return { platform: plat, ctype, clevel };
+  }
+
+  // 复合列名缓存：列索引 → {platform, ctype, clevel}
+  //  readImpFile 里建立，buildImpRows 时套用
+  let impCompound = {};
+
+
   // 值清洗：11位手机号 ↔ 微信号 混装拆分（历史数据常见）
   function splitPhoneWx(v){
     const s = String(v==null?'':v).trim();
@@ -2821,16 +3042,23 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
         impState.raw = rows.slice(hi+1);
         // 自动映射
         const map = {}, used = {};
+        impCompound = {};        // 重置复合列名缓存
         impState.header.forEach((h,i)=>{
+          // 先试复合列名：「抖短3」→ 平台抖音 + 视频为主 + L3
+          //  这类列整列都是达人数据，必须翻译成三个字段，不能被当成未识别列丢掉
+          const cp = parseCompoundCol(h);
+          if (cp){
+            impCompound[i] = cp;
+            // 该列本身不映射到单一字段（值要靠 buildImpRows 展开）
+            return;
+          }
           const k = autoMatch(h);
           // 同一字段只认第一个（wx1/wx2/wx3 除外，允许重复）
           if (k && (used[k] && ['wx1','wx2','wx3'].indexOf(k)<0 ? false : true)){
             if (!used[k] || ['wx1','wx2','wx3'].indexOf(k)>=0){ map[i] = k; used[k]=true; }
           }
         });
-        // 多个微信号列 → 自动排成 wx1/wx2/wx3
-        const wxCols = Object.keys(map).filter(i=>map[i]==='wx1');
-        wxCols.forEach((i,n)=>{ map[i] = n===0?'wx1':n===1?'wx2':n===2?'wx3':'wx1'; });
+        // 复合列名里提到的字段，若标表头另有独立列 → 以独立列为准（更精确），此处只做提示
         impState.map = map;
         renderImpMap();
       }catch(err){ impErr('读取失败：'+err.message); }
@@ -2878,6 +3106,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     header.forEach((h,i)=>{
       const cur = map[i] || '';
       const sample = raw.slice(0,3).map(r=>String(r[i]==null?'':r[i]).trim()).filter(Boolean)[0] || '';
+      // 复合列名（抖短3）：不是一个字段，而是拆成 平台+类型+等级 三个字段
+      const cp = impCompound[i];
+      if (cp){
+        const parts = [];
+        if (cp.platform) parts.push('平台=' + cp.platform);
+        if (cp.ctype)    parts.push('带货类型=' + cp.ctype);
+        if (cp.clevel)   parts.push('带货等级=' + cp.clevel);
+        html += '<tr class="cprow">'+
+          '<td class="colname">'+esc(h)+'</td>'+
+          '<td><span class="hit">✓ 简写拆解</span></td>'+
+          '<td><span class="cpbadge">'+esc(parts.join('　+　'))+'</span></td>'+
+          '<td style="color:var(--tx3);font-size:11.5px">'+esc(sample.slice(0,26))+'</td>'+
+        '</tr>';
+        return;
+      }
       html += '<tr>'+
         '<td class="colname">'+esc(h||'（空列名 '+(i+1)+'）')+'</td>'+
         '<td>'+(cur?'<span class="hit">✓ 已识别</span>':'<span class="miss">— 未识别</span>')+'</td>'+
@@ -2890,12 +3133,19 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     });
     html += '</tbody></table>';
 
-    // 预览
-    const prevCols = header.map((h,i)=>({h,i})).filter(o=>map[o.i]);
+    // 预览：把复合列也显示出来（用拆解后的字段名做表头）
+    const prevCols = header.map((h,i)=>({h,i}))
+      .filter(o=>map[o.i] || impCompound[o.i]);
     if (prevCols.length){
       html += '<div class="impsep">数据预览（前 5 行）</div>';
       html += '<div class="impprev"><table><thead><tr>'+
-        prevCols.map(o=>'<th>'+esc(IMP_FIELDS.find(f=>f.k===map[o.i]).label)+'</th>').join('')+
+        prevCols.map(o=>{
+          const cp = impCompound[o.i];
+          if (cp) return '<th>'+esc(o.h)+' <span style="font-weight:400;color:var(--tx3)">→ '+
+            esc([cp.platform, cp.ctype, cp.clevel].filter(Boolean).join('/'))+'</span></th>';
+          const f = IMP_FIELDS.find(x=>x.k===map[o.i]);
+          return '<th>'+esc(f?f.label:map[o.i])+'</th>';
+        }).join('')+
       '</tr></thead><tbody>';
       impState.raw.slice(0,5).forEach(r=>{
         html += '<tr>'+prevCols.map(o=>'<td title="'+esc(r[o.i])+'">'+esc(String(r[o.i]==null?'':r[o.i]).slice(0,32))+'</td>').join('')+'</tr>';
@@ -2924,6 +3174,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   // 把一行表格 → 内部对象
   function rowToEntry(rawRow, headerRow){
     const o = {};
+    // 先铺复合列（如「抖短3」）：平台 / 带货类型 / 带货等级
+    //  这些值优先于同名独立列吗？——不。独立列更精确，所以复合列只「填空」，
+    //  已经有了的值不覆盖。顺序上先跑复合列，后面的独立列自然会覆盖它。
+    Object.keys(impCompound).forEach(i=>{
+      const cp = impCompound[i];
+      const v = String(rawRow[i]==null?'':rawRow[i]).trim();
+      // 列名里写明了等级（3→L3），那整列都按这个等级算；
+      // 但若单元格里另有等级信息（如 "L4"），以单元格为准
+      const cellLv = (v.match(/\bL?([1-8])\b/i)||[])[1];
+      if (cp.platform && !o.platform) o.platform = cp.platform;
+      if (cp.ctype    && !o.ctype)    o.ctype    = cp.ctype;
+      const lv = cellLv ? ('L'+cellLv) : cp.clevel;
+      if (lv && !o.clevel) o.clevel = lv;
+    });
+
     Object.keys(impState.map).forEach(i=>{
       const k = impState.map[i];
       const v = String(rawRow[i]==null?'':rawRow[i]).trim();
@@ -3102,6 +3367,479 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   ];
   // 「补联系方式」只开这几项（用户明确：微信号、手机号、收货人、收货地址）
   const PATCH_KEYS = ['wx1','wx2','wx3','phone','receiver','address'];
+
+  // ============================================================
+  //  快捷粘贴解析：把杂乱的聊天内容解析成结构化达人条目
+  // ============================================================
+  //  用户实际粘贴的内容长这样（千奇百怪，必须宽容）：
+  //    抖短 夕阳手工美食 Sx11111 13888888888          ← 单行空格分隔
+  //    ①平台：视频号 ②达人：高娜丽美食记 ③微信：lkq1777888   ← 编号 + 字段名
+  //    平台:抖音 / 达人:何大厨 / 微信 hes承                 ← 半角冒号
+  //    达人昵称：xxx\n微信号：yyy\n手机：zzz                ← 多行
+  //  设计原则：
+  //    1. 先按「字段名标签」切分（① ② ③、平台：、达人：、微信：…）
+  //    2. 没有标签的整行 → 按空格/tab 切碎，再用「形态」猜类型
+  //    3. 宁可漏识别成「未知」，也不要把值塞错字段
+  // ============================================================
+
+  // 字段标签 → 内部字段名
+  //  注意顺序：长的、具体的放前面，避免「微信」先命中「微信号」
+  const PASTE_LABELS = [
+    [/^(?:达人?昵称|博主名|博主|达人名|达人|姓名|名字|昵称|账号名称|账号)$/, 'nickname'],
+    // 微信 1/2/3：分开映射，才能把「微信2：xxx」落到 wx2 而不是挤进 wx1
+    [/^(?:微信号?|微信id|vx|v信|威|加v|联系方式?|客服微信|达人微信|商务微信|wx)[\s_\-]*[2二两]?$/, 'wx'],
+    [/^(?:微信号?|vx|v信|wx)[\s_\-]*[3三]$/, 'wx3'],
+    [/^(?:手机号?|电话|联系电话|手机号码|收货人电话|tel|phone|mobile)$/, 'phone'],
+    [/^(?:平台|所属平台|渠道|来源平台)$/, 'platform'],
+    [/^(?:达人号|抖音号|快手号|账号id|主页|抖音id|handle)$/, 'handle'],
+    [/^(?:uid|达人uid|用户id|达人id|抖音uid)$/, 'uid'],
+    [/^(?:带货等级|等级|级别|lv|达人等级)$/, 'clevel'],
+    [/^(?:带货类型|类型|直播类型|带货方式)$/, 'ctype'],
+    [/^(?:达人赛道|赛道|达人类型)$/, 'track'],
+    [/^(?:带货分类|分类|品类)$/, 'cate'],
+    [/^(?:合作类型|合作方式|合作)$/, 'coop'],
+    [/^(?:粉丝数?|粉丝|粉丝量|fans)$/, 'fans'],
+    [/^(?:收货人|收件人|联系人)$/, 'receiver'],
+    [/^(?:收货地址|地址|详细地址)$/, 'address'],
+    [/^(?:备注|说明|note)$/, 'note']
+  ];
+  function pasteLabelKey(s){
+    const t = String(s||'').trim().replace(/^[\s\u3000]+|[\s\u3000]+$/g,'')
+      .replace(/[（(].*?[)）]/g,'').replace(/[：:]\s*$/,'').toLowerCase();
+    if (!t) return '';
+    // 先判「微信3 / 微信三」，再判通用「微信」——顺序不能反
+    if (/^(?:微信号?|vx|v信|wx)[\s_\-]*[3三]$/.test(t)) return 'wx3';
+    if (/^(?:微信号?|vx|v信|wx)[\s_\-]*[2二两]$/.test(t)) return 'wx2';
+    for (const [re, k] of PASTE_LABELS){ if (re.test(t)) return k; }
+    return '';
+  }
+
+  // 带编号的行首：「①」「②」「1.」「(3)」「③、」→ 剥掉
+  function stripNo(s){
+    return String(s||'').replace(/^[\s\u3000]*(?:[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]|[（(]?\d{1,2}[)）.、:：])\s*/, '');
+  }
+
+  // 值形态判断（用于无标签时猜字段）
+  const RE_PHONE = /^1[3-9]\d{9}$/;
+  const looksPhone = s => RE_PHONE.test(String(s||'').replace(/[\s-]/g,''));
+  const looksWx    = s => /^[A-Za-z_\-][A-Za-z0-9_\-]{4,19}$/.test(String(s||'').trim());
+  const looksUid   = s => /^\d{15,20}$/.test(String(s||'').trim());
+  const looksHandle= s => /^\d{8,14}$/.test(String(s||'').trim());
+  const looksLv    = s => /^L?[1-8]$/i.test(String(s||'').trim());
+
+  // 平台关键词
+  function guessPlatform(s){
+    const t = String(s||'');
+    for (const [re, name] of PLAT_ALIAS){ if (re.test(t)) return name; }
+    return '';
+  }
+  // 带货类型关键词（只在值本身就是「短/直/视频为主/直播为主」时命中）
+  function guessCtype(s){
+    const t = String(s||'').trim();
+    if (/^(短视频?|视频为主|视频|短)$/.test(t)) return '视频为主';
+    if (/^(直播?|直播为主|直播|直)$/.test(t)) return '直播为主';
+    if (/^视直一体$/.test(t)) return '视直一体';
+    if (/^橱窗$/.test(t)) return '橱窗';
+    if (/^种草$/.test(t)) return '种草';
+    return '';
+  }
+
+  // 昵称形态：含中文，或含 emoji / 特殊符号，长度 2–30
+  const looksNick = s => {
+    const t = String(s||'').trim();
+    if (t.length < 1 || t.length > 30) return false;
+    if (/^https?:/i.test(t)) return false;
+    return /[\u4e00-\u9fa5]/.test(t) || /[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(t);
+  };
+
+  // ---------- 主解析函数 ----------
+  //  返回：{ entries:[{nickname,wx1,wx2,wx3,phone,platform,handle,uid,clevel,ctype,track,cate,coop}], raw }
+  function parsePaste(text){
+    const src = String(text||'').replace(/\r\n?/g,'\n').replace(/\u3000/g,' ');
+    const lines = src.split('\n').map(x=>x.trim()).filter(Boolean);
+    const entries = [];
+    let cur = null;
+
+    const ensure = () => { if (!cur){ cur = { nickname:'', wx1:'', wx2:'', wx3:'', phone:'', platform:'', handle:'', uid:'', clevel:'', ctype:'', track:'', cate:'', coop:'' }; entries.push(cur); } return cur; };
+
+    // 把「值」按类型放进当前条目
+    const put = (o, key, val, force) => {
+      val = String(val==null?'':val).trim();
+      if (!val) return;
+      // 归一化字段名
+      if (key === 'wx') key = '';
+      // 显式指定了槽位（微信2 / 微信3）→ 直接落位，不做形态推断
+      if (key === 'wx2' || key === 'wx3'){ if (!o[key]) o[key] = val; return; }
+      if (key === 'platform'){ const p = guessPlatform(val) || val; o.platform = o.platform || p; return; }
+      if (key === 'ctype'){ const c = guessCtype(val) || val; o.ctype = o.ctype || c; return; }
+      if (key === 'clevel'){ const m = val.match(/([1-8])/); if (m) o.clevel = o.clevel || ('L'+m[1]); return; }
+      if (key === 'phone'){ const p = val.replace(/[\s-]/g,''); o.phone = o.phone || p; return; }
+      if (key === 'nickname'){ o.nickname = o.nickname || val; return; }
+      if (key === 'handle'){ o.handle = o.handle || val; return; }
+      if (key === 'uid'){ o.uid = o.uid || val; return; }
+      if (key === 'track' || key === 'cate' || key === 'coop' || key === 'receiver' || key === 'address'){
+        o[key] = o[key] || val; return;
+      }
+      if (key === 'fans'){ const n = Number(val.replace(/[^\d.]/g,'')); if (!isNaN(n)) o.fans = o.fans || Math.round(n); return; }
+      // 无字段名 → 按形态猜（force 时也走这里）
+      if (looksPhone(val)){ o.phone = o.phone || val.replace(/[\s-]/g,''); return; }
+      if (looksWx(val)){
+        // 微信号落位：wx1 → wx2 → wx3
+        const slot = ['wx1','wx2','wx3'].find(k=>!o[k]);
+        if (slot) o[slot] = val;
+        return;
+      }
+      if (looksUid(val)){ o.uid = o.uid || val; return; }
+      if (looksLv(val)){ o.clevel = o.clevel || ('L'+val.replace(/L/i,'')); return; }
+      if (looksHandle(val)){ o.handle = o.handle || val; return; }
+      if (looksNick(val)){ o.nickname = o.nickname || val; return; }
+      // 兜底：非空但认不出形态 → 当昵称（避免丢数据）
+      o.nickname = o.nickname || val;
+    };
+
+    for (const rawLine of lines){
+      let line = rawLine;
+      // 一行里可能塞了多段（①②③…）→ 先按编号切开
+      //  「①平台：视频号 ②达人：xxx ③微信：yyy」→ 三段
+      const segs = line.split(/(?=[①②③④⑤⑥⑦⑧⑨⑩])/).map(x=>x.trim()).filter(Boolean);
+      if (segs.length > 1){
+        for (const seg of segs){
+          const s2 = stripNo(seg);
+          let m = s2.match(/^([^:：]{1,10})[:：]\s*(.+)$/);
+          if (m){
+            const k = pasteLabelKey(m[1]);
+            if (k === 'nickname' || k === 'platform' || k === 'wx' || k === 'phone') ensure();
+            put(ensure(), k, m[2].trim());
+          } else {
+            put(ensure(), '', s2);
+          }
+        }
+        continue;
+      }
+
+      // 单行：剥编号后看有没有「字段名：值」
+      //  关键：值里可能还嵌着别的标签（「达人：双号达人 微信：xxx 微信2：yyy」）
+      //        → 先整体按「标签：」切开，逐段识别，最后一段可能才是真正独立的值
+      const s1 = stripNo(line);
+      // 在字符串里找所有「标签：」的位置
+      const tagHits = [];
+      const tagRe = /(?:^|\s)([^\s:：]{1,10})[:：]/g;
+      let tm;
+      while ((tm = tagRe.exec(s1)) !== null){
+        const key = pasteLabelKey(tm[1]);
+        if (key) tagHits.push({ at: tm.index + tm[0].indexOf(tm[1]), key, label: tm[1] });
+      }
+      if (tagHits.length){
+        for (let k = 0; k < tagHits.length; k++){
+          const cur_ = tagHits[k];
+          const valStart = s1.indexOf('：', cur_.at) >= 0 && s1.indexOf('：', cur_.at) < (tagHits[k+1] ? tagHits[k+1].at : 1e9)
+            ? s1.indexOf('：', cur_.at) + 1
+            : s1.indexOf(':', cur_.at) + 1;
+          const valEnd = tagHits[k+1] ? tagHits[k+1].at : s1.length;
+          const val = s1.slice(valStart, valEnd).trim();
+          if (!val) continue;
+          if ((cur_.key === 'nickname' || cur_.key === 'platform') && cur && (cur.nickname || cur.wx1 || cur.phone)){
+            cur = null;
+          }
+          put(ensure(), cur_.key, val);
+        }
+        continue;
+      }
+
+      // 无字段名 → 按空格 / tab 切碎逐个猜
+      const parts = s1.split(/[\s\t]+/).filter(Boolean);
+      if (parts.length > 1){
+        for (const p of parts){
+          const o = ensure();
+          // 复合 token（「抖短」）→ 用复用复合解析器的等价逻辑拆平台/类型/等级
+          const cp = parseCompoundCol(p);
+          if (cp){
+            if (cp.platform && !o.platform) o.platform = cp.platform;
+            if (cp.ctype    && !o.ctype)    o.ctype    = cp.ctype;
+            if (cp.clevel   && !o.clevel)   o.clevel   = cp.clevel;
+            continue;
+          }
+          const pf = guessPlatform(p);
+          const ct = guessCtype(p);
+          if (pf && !o.platform){ o.platform = pf; if (ct && !o.ctype) o.ctype = ct; continue; }
+          if (ct && !o.ctype){ o.ctype = ct; continue; }
+          put(o, '', p);
+        }
+        continue;
+      }
+
+      // 单 token 一行
+      const o = ensure();
+      const cp1 = parseCompoundCol(s1);
+      if (cp1){
+        if (cp1.platform && !o.platform) o.platform = cp1.platform;
+        if (cp1.ctype    && !o.ctype)    o.ctype    = cp1.ctype;
+        if (cp1.clevel   && !o.clevel)   o.clevel   = cp1.clevel;
+        continue;
+      }
+      const pf = guessPlatform(s1), ct = guessCtype(s1);
+      if (pf && !o.platform){ o.platform = pf; if (ct && !o.ctype) o.ctype = ct; continue; }
+      if (ct && !o.ctype){ o.ctype = ct; continue; }
+      put(o, '', s1);
+    }
+
+    // 清理：没有昵称、也没有任何联系方式的行，丢弃
+    return entries.filter(e => e.nickname || e.wx1 || e.phone || e.handle || e.uid);
+  }
+
+  // 昵称归一化：用于「同一个人」判定
+  //  用户要求：表情、特殊符号、括号内容不一样的 → 视为同一人
+  //    「何大厨说味道」 vs 「何大厨说味道（官方）」 → 同一人
+  //    「高娜丽美食记」 vs 「高娜丽美食记🍜」        → 同一人
+  function normNickBase(s){
+    return String(s||'')
+      .replace(/[（(【\[].*?[)）】\]]/g,'')        // 去掉括号及其内容
+      .replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\u2190-\u21FF\u2B00-\u2BFF]/gu,'')  // emoji
+      .replace(/[\s\u3000·・.．,，、!！?？~～\-_—|/\\]+/g,'')  // 标点、空格
+      .replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'')     // 只留中英文数字
+      .toLowerCase();
+  }
+  // 在已有数据里找同一个人
+  //  返回命中的行 r，或 null
+  function findSameCreator(nick, wxList, phone){
+    const base = normNickBase(nick);
+    const wxs  = (wxList||[]).map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+    const ph   = String(phone||'').replace(/\D/g,'');
+    for (const r of ALL){
+      // ① 微信号命中 → 强证据
+      if (wxs.length){
+        const rw = [r[8],r[9],r[10]].map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+        if (rw.some(x=>wxs.indexOf(x)>=0)) return r;
+      }
+      // ② 手机号命中 → 强证据
+      if (ph && String(r[12]||'').replace(/\D/g,'') === ph) return r;
+      // ③ 昵称归一化后一致 → 中等证据
+      if (base && normNickBase(r[1]) === base) return r;
+    }
+    return null;
+  }
+
+  // 把解析出的条目写进现有行（联系人信息只补空位，不覆盖）
+  function mergeIntoRow(r, e){
+    const filled = [];
+    const wxSlots = ['wx1','wx2','wx3'];
+    // 收集本次解析出的所有微信号
+    const newWxs = [e.wx1,e.wx2,e.wx3].map(x=>String(x||'').trim()).filter(Boolean);
+    for (const w of newWxs){
+      // 已在任一槽位 → 跳过
+      if (wxSlots.some(k=>String(r[8 + wxSlots.indexOf(k)]||'').trim().toLowerCase() === w.toLowerCase())) continue;
+      // 找一个空槽
+      const idxEmpty = [8,9,10].find(i => !String(r[i]||'').trim());
+      if (idxEmpty == null){
+        // 三个都满了 → 放弃（留待人工处理，避免乱覆盖）
+        filled.push('微信号' + w + '（3 个位置已满，未写入）');
+        continue;
+      }
+      const idx = IDX; // 便于阅读
+      r[idxEmpty] = w;
+      filled.push((idxEmpty===8?'微信号':idxEmpty===9?'微信号2':'微信号3') + '=' + w);
+    }
+    // 手机号
+    if (e.phone && !String(r[12]||'').trim()){ r[12] = e.phone; filled.push('手机号=' + e.phone); }
+    // 其它字段：只填空
+    const mapOther = [[14,'track',e.track],[15,'cate',e.cate],[16,'coop',e.coop]];
+    if (e.platform && !String(r[0]||'').trim()){ r[0] = e.platform; filled.push('平台=' + e.platform); }
+    if (e.ctype && !String(r[5]||'').trim()){ r[5] = e.ctype; filled.push('带货类型=' + e.ctype); }
+    if (e.clevel && !String(r[6]||'').trim()){ r[6] = e.clevel; filled.push('带货等级=' + e.clevel); }
+    if (e.handle && !String(r[2]||'').trim()){ r[2] = e.handle; filled.push('达人号=' + e.handle); }
+    if (e.uid && !String(r[3]||'').trim()){ r[3] = e.uid; filled.push('UID=' + e.uid); }
+    for (const [i, , v] of mapOther){ if (v && !String(r[i]||'').trim()) r[i] = v; }
+    return filled;
+  }
+
+  // ---------- 粘贴板弹层 ----------
+  //  入口：头部「⚡ 快捷粘贴」按钮
+  function openPaste(){
+    if (!$('#pasteModal')){
+      const m = document.createElement('div');
+      m.className = 'modal'; m.id = 'pasteModal';
+      m.innerHTML =
+        '<div class="mbox wide" style="max-width:820px">'+
+          '<div class="mhead"><b>⚡ 快捷粘贴录入</b><button class="mclose" id="pasteClose">✕</button></div>'+
+          '<div class="mbody" id="pasteBody">'+
+            '<div class="mnote">把内容粘进来就行，<b>格式不用整理</b>。<br>'+
+              '认得出这些写法：<code>抖短 夕阳手工美食 Sx11111 13888888888</code>　'+
+              '<code>①平台：视频号 ②达人：高娜丽美食记 ③微信：lkq1777888</code>　'+
+              '<code>达人昵称：xx ＋ 微信号：yy（换行）</code><br>'+
+              '多行会拆成多条；昵称相同的会自动并入已有记录的联系方式列（微信1→2→3）。</div>'+
+            '<textarea id="pasteIn" class="pastebox" placeholder="在这里粘贴…&#10;&#10;抖短 夕阳手工美食 Sx11111 13888888888&#10;①平台：视频号&#10;②达人：高娜丽美食记&#10;③微信：lkq1777888"></textarea>'+
+            '<div id="pastePrev" class="pasteprev"></div>'+
+          '</div>'+
+          '<div class="mfoot"><span class="mtip" id="pasteTip"></span><span style="flex:1"></span>'+
+            '<button class="btn" id="pasteCancel">取消</button>'+
+            '<button class="btn primary" id="pasteGo" disabled>确认录入</button></div>'+
+        '</div>';
+      document.body.appendChild(m);
+      m.addEventListener('click', e=>{ if (e.target.id === 'pasteModal') closePaste(); });
+      $('#pasteClose').onclick = closePaste;
+      $('#pasteCancel').onclick = closePaste;
+      const ta = $('#pasteIn');
+      ta.addEventListener('input', ()=> renderPastePrev());
+      ta.addEventListener('paste', ()=> setTimeout(()=>renderPastePrev(), 30));
+      $('#pasteGo').onclick = doPasteSubmit;
+    }
+    $('#pasteIn').value = '';
+    $('#pastePrev').innerHTML = '';
+    $('#pasteTip').textContent = '';
+    $('#pasteGo').disabled = true;
+    $('#pasteModal').classList.add('on');
+    setTimeout(()=>$('#pasteIn').focus(), 60);
+  }
+  function closePaste(){ const m=$('#pasteModal'); if(m) m.classList.remove('on'); }
+
+  // 解析预览
+  function renderPastePrev(){
+    const txt = $('#pasteIn').value;
+    const box = $('#pastePrev');
+    if (!txt.trim()){ box.innerHTML = ''; $('#pasteGo').disabled = true; return; }
+    const list = parsePaste(txt);
+    window.__pasteList = list;
+    if (!list.length){ box.innerHTML = '<div class="mnote warn">没解析出可用的条目，检查一下内容？</div>'; $('#pasteGo').disabled = true; return; }
+    $('#pasteGo').disabled = false;
+    let html = '<div class="impsep">解析结果（'+list.length+' 条）</div>';
+    html += '<div class="impprev"><table><thead><tr>'+
+      '<th>平台</th><th>昵称</th><th>微信号</th><th>手机号</th><th>等级</th><th>处理方式</th>'+
+    '</tr></thead><tbody>';
+    list.forEach(e=>{
+      const hit = findSameCreator(e.nickname, [e.wx1,e.wx2,e.wx3], e.phone);
+      // 显示微信：解析出的放进一个列表展示
+      const wxs = [e.wx1,e.wx2,e.wx3].filter(Boolean);
+      let act = '<span class="badge-new">新增</span>';
+      if (hit){
+        const slots = [8,9,10].map(i=>String(hit[i]||'').trim()).filter(Boolean);
+        const fresh = wxs.filter(w=>!slots.some(s=>s.toLowerCase()===w.toLowerCase()));
+        act = fresh.length
+          ? '<span class="badge-merge">并入 '+esc(hit[1]||'')+' → 微信'+(slots.length+1)+'</span>'
+          : '<span class="badge-skip">已存在，无需写入</span>';
+      }
+      // 单条内多个微信号 → 提示
+      const wxCol = wxs.length ? wxs.map(w=>esc(w)).join('　') : '<span style="color:var(--tx3)">未知</span>';
+      html += '<tr>'+
+        '<td>'+esc(e.platform||'—')+'</td>'+
+        '<td>'+esc(e.nickname||'—')+'</td>'+
+        '<td style="font-size:11.5px">'+wxCol+'</td>'+
+        '<td>'+esc(e.phone||'—')+'</td>'+
+        '<td>'+esc(e.clevel||'—')+'</td>'+
+        '<td>'+act+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    box.innerHTML = html;
+  }
+
+  // 提交粘贴内容
+  async function doPasteSubmit(){
+    const list = window.__pasteList || [];
+    if (!list.length) return;
+    const btn = $('#pasteGo'); btn.disabled = true;
+    const setT = m => { $('#pasteTip').textContent = m; };
+    let added = 0, merged = 0, skipped = 0, failed = 0;
+
+    for (let n = 0; n < list.length; n++){
+      const e = list[n];
+      setT('处理中 ' + (n+1) + '/' + list.length + ' …');
+      try{
+        const hit = findSameCreator(e.nickname, [e.wx1,e.wx2,e.wx3], e.phone);
+        if (hit){
+          // 已有此人 → 联系方式只补空位
+          const filled = mergeIntoRow(hit, e);
+          if (!filled.length){ skipped++; continue; }
+          // 云端同步
+          if (isCfgOk()){
+            const patch = {};
+            if (String(hit[8]||'').trim()) patch.wx1 = hit[8];
+            if (String(hit[9]||'').trim()) patch.wx2 = hit[9];
+            if (String(hit[10]||'').trim()) patch.wx3 = hit[10];
+            if (String(hit[12]||'').trim()) patch.phone = hit[12];
+            if (String(hit[0]||'').trim())  patch.platform = hit[0];
+            if (String(hit[2]||'').trim())  patch.handle = hit[2];
+            if (Object.keys(patch).length){
+              if (hit.__id != null){
+                await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(hit.__id), {method:'PATCH', body:patch});
+              } else {
+                const h = String(hit[2]||'').trim(), u = String(hit[3]||'').trim();
+                const q = h ? 'handle=eq.'+encodeURIComponent(h) : u ? 'uid=eq.'+encodeURIComponent(u) : null;
+                if (q){
+                  const found = await cbFetch('/'+CB.table+'?'+q+'&select=id&limit=1');
+                  if (Array.isArray(found) && found.length){
+                    hit.__id = found[0].id;
+                    await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(hit.__id), {method:'PATCH', body:patch});
+                  } else {
+                    await cbFetch('/'+CB.table, {method:'POST', body:Object.assign({
+                      nickname: hit[1]||'', handle: hit[2]||null, uid: hit[3]||null,
+                      editor:'2517', source:'paste'
+                    }, patch)});
+                  }
+                }
+              }
+            }
+          }
+          merged++;
+          continue;
+        }
+
+        // 新人 → 建行
+        const row = new Array(N_DATA_COL).fill('');
+        row[0] = e.platform || '抖音';
+        row[1] = e.nickname || '';
+        row[2] = e.handle || '';
+        row[3] = e.uid || '';
+        row[5] = e.ctype || '';
+        row[6] = e.clevel || '';
+        if (e.fans) row[4] = String(e.fans);
+        row[8]  = e.wx1 || '';
+        row[9]  = e.wx2 || '';
+        row[10] = e.wx3 || '';
+        row[12] = e.phone || '';
+        row[14] = e.track || '';
+        row[15] = e.cate || '';
+        row[16] = e.coop || '';
+        row.__src = 'local';
+        ALL.unshift(row);
+
+        if (isCfgOk()){
+          const body = {
+            platform: row[0]||null, nickname: row[1]||'', handle: row[2]||null, uid: row[3]||null,
+            ctype: row[5]||null, clevel: row[6]||null,
+            wx1: row[8]||null, wx2: row[9]||null, wx3: row[10]||null,
+            phone: row[12]||null, editor:'2517', source:'paste'
+          };
+          try{
+            const created = await cbFetch('/'+CB.table, {method:'POST', body});
+            if (Array.isArray(created) && created.length){ row.__id = created[0].id; row.__src = 'remote'; }
+          }catch(err){
+            // 云端已存在（撞唯一索引）→ 回查一次补上 id，改为合并
+            if (err.dup){
+              const h = String(row[2]||'').trim(), u = String(row[3]||'').trim();
+              const q = h ? 'handle=eq.'+encodeURIComponent(h) : u ? 'uid=eq.'+encodeURIComponent(u) : null;
+              if (q){
+                const found = await cbFetch('/'+CB.table+'?'+q+'&select=id&limit=1');
+                if (Array.isArray(found) && found.length) row.__id = found[0].id;
+              }
+            }
+          }
+        }
+        added++;
+      }catch(err){
+        failed++;
+      }
+    }
+
+    setT('');
+    closePaste();
+    apply();
+    const parts = [];
+    if (added)   parts.push('新增 ' + added + ' 位');
+    if (merged)  parts.push('并入已有 ' + merged + ' 位');
+    if (skipped) parts.push('跳过 ' + skipped + ' 位（信息已存在）');
+    if (failed)  parts.push('失败 ' + failed + ' 位');
+    toast('快捷录入完成：' + (parts.join('，') || '无变化'));
+  }
 
   function openEntry(prefill, mode, target){
     entryMode = mode || 'new';
@@ -3297,7 +4035,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   $('#markOk').onclick     = submitMark;
   $('#markModal').addEventListener('click', e=>{ if (e.target.id === 'markModal') closeMarkPick(); });
 
-  document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ closeModal(); closeImp(); closeMarkPick(); } });
+  document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ closeModal(); closeImp(); closeMarkPick(); if (typeof closePaste==='function') closePaste(); } });
+
+  // 快捷粘贴录入
+  $('#pasteBtn').onclick = openPaste;
 
   // 导入表格
   $('#impBtn').onclick = openImp;  $('#impClose').onclick = closeImp;
