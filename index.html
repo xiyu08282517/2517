@@ -42,6 +42,13 @@ header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdro
 .stat b{font-size:17px;font-variant-numeric:tabular-nums}
 .stat span{font-size:12px;color:var(--tx2)}
 .stat.hi b{color:var(--brand)}
+/* 统计卡片 = 快捷筛选按钮 */
+.statbtn{font:inherit;cursor:pointer;transition:.14s;text-align:left;position:relative}
+.statbtn:hover{border-color:#c9d2de;box-shadow:0 3px 10px rgba(15,23,42,.09);transform:translateY(-1px)}
+.statbtn.on{background:var(--brandbg);border-color:var(--brand)}
+.statbtn.on b{color:var(--brand)}
+.statbtn.on span{color:var(--brand);font-weight:600}
+.statbtn.on::after{content:"✓";position:absolute;top:4px;right:7px;font-size:10px;color:var(--brand);font-weight:700}
 
 .filters{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
 .frow{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
@@ -418,10 +425,14 @@ tr.mark-row:hover{background:#fff5f0}
   </div>
 
   <div class="stats">
-    <div class="stat hi"><b id="sShown">0</b><span>当前结果</span></div>
-    <div class="stat"><b id="sTotal">0</b><span>达人总数</span></div>
-    <div class="stat"><b id="sWx">0</b><span>有微信号</span></div>
-    <div class="stat"><b id="sAddr">0</b><span>有地址</span></div>
+    <button type="button" class="stat statbtn" id="cShown" title="点击：清空所有筛选，显示全部达人">
+      <b id="sShown">0</b><span>当前结果</span></button>
+    <button type="button" class="stat statbtn" id="cTotal" title="点击：清空所有筛选，显示全部达人">
+      <b id="sTotal">0</b><span>达人总数</span></button>
+    <button type="button" class="stat statbtn" id="cWx" title="点击：只看有微信号的达人（再点取消）">
+      <b id="sWx">0</b><span>有微信号</span></button>
+    <button type="button" class="stat statbtn" id="cAddr" title="点击：只看有收货地址的达人（再点取消）">
+      <b id="sAddr">0</b><span>有地址</span></button>
   </div>
 
   <div id="simPanel"></div>
@@ -785,7 +796,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   const state = {q:'', plat:new Set(), type:new Set(), level:'', fmin:'', fmax:'', onlyWx:false,
                  salesUnk:false, wxUnk:false, fansUnk:false, hideUnk:false,
                  track:new Set(), cate:new Set(), coop:new Set(), mark:new Set(),
-                 onlyAbn:false, onlyTeam:false,
+                 onlyAbn:false, onlyTeam:false, onlyAddr:false,
                  page:1, sortKey:-1, sortDir:-1, result:ALL, sim:false, simInfo:null, markSet:null,
                  scored:false, scoreMap:null, exactN:0, dupGroups:null, terms:[]};
 
@@ -1268,6 +1279,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (lv !== state.level) return false;
     }
     if (state.onlyWx && !hasWx(r)) return false;
+    if (state.onlyAddr && !hasAddr(r)) return false;
     if (state.wxUnk && hasWx(r)) return false;
     if (state.salesUnk && !isUnk(r[7])) return false;
     if (state.fansUnk && !isUnk(r[4])) return false;
@@ -1541,6 +1553,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     $('#sShown').textContent=fmt(total);
     $('#sWx').textContent=fmt(res.filter(hasWx).length);
     $('#sAddr').textContent=fmt(res.filter(hasAddr).length);
+    // 卡片高亮态与实际筛选状态保持同步（别处改动 state 也会反映过来）
+    syncStatCards();
     const simOn = !!(state.sim && state.q && state.simInfo);
     const unkOn = res.filter(r=>isUnk(r[0])||isUnk(r[5])||isUnk(r[6])||isUnk(r[7])).length;
     let hintTxt;
@@ -1716,10 +1730,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     state.track.clear(); state.cate.clear(); state.coop.clear(); state.mark.clear();
     state.level=''; state.fmin=''; state.fmax=''; state.onlyWx=false;
     state.salesUnk=false; state.wxUnk=false; state.fansUnk=false; state.hideUnk=false;
-    state.onlyAbn=false; state.onlyTeam=false;
+    // 重置回到首屏默认态：只看有微信号开启（并记住）
+    state.onlyWx=true;
+    try{ localStorage.setItem('daren_onlywx','1'); }catch(_){}
+    $('#fWx').classList.add('on');
+    state.onlyAbn=false; state.onlyTeam=false; state.onlyAddr=false;
     state.sortKey=-1; state.sortDir=-1;
     $('#fLevel').value=''; $('#fFansMin').value=''; $('#fFansMax').value='';
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    document.querySelectorAll('.statbtn').forEach(c=>c.classList.remove('on'));
     // 同步多选下拉：清空勾选 + 按钮文字复位
     MSELS.forEach(([sel,k,ph])=>{
       const root=document.querySelector(sel); if(!root) return;
@@ -1747,11 +1766,54 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   let ft;
   const onNum=()=>{ clearTimeout(ft); ft=setTimeout(()=>{ state.fmin=$('#fFansMin').value; state.fmax=$('#fFansMax').value; apply(); },300); };
   $('#fFansMin').oninput=onNum; $('#fFansMax').oninput=onNum;
-  $('#fWx').onclick=e=>{ state.onlyWx=!state.onlyWx; e.target.classList.toggle('on',state.onlyWx); apply(); };
+  $('#fWx').onclick=e=>{ state.onlyWx=!state.onlyWx; e.target.classList.toggle('on',state.onlyWx); try{ localStorage.setItem('daren_onlywx', state.onlyWx?'1':'0'); }catch(_){} state.page=1; apply(); };
   $('#fWxUnk').onclick=e=>{ state.wxUnk=!state.wxUnk; e.target.classList.toggle('on',state.wxUnk); apply(); };
   $('#fSalesUnk').onclick=e=>{ state.salesUnk=!state.salesUnk; e.target.classList.toggle('on',state.salesUnk); apply(); };
   $('#fFansUnk').onclick=e=>{ state.fansUnk=!state.fansUnk; e.target.classList.toggle('on',state.fansUnk); apply(); };
   $('#fHideUnk').onclick=e=>{ state.hideUnk=!state.hideUnk; e.target.classList.toggle('on',state.hideUnk); apply(); };
+
+  // ---------- 统计卡片 = 快捷筛选按钮 ----------
+  //  「当前结果」/「达人总数」→ 清空全部筛选；「有微信号」/「有地址」→ 开关式筛选
+  function syncStatCards(){
+    const cWx = $('#cWx'), cAddr = $('#cAddr');
+    if (cWx)   cWx.classList.toggle('on', !!state.onlyWx);
+    if (cAddr) cAddr.classList.toggle('on', !!state.onlyAddr);
+    // 「当前结果」在有筛选时也点亮，提示用户现在看的不是全量
+    const filtering = !!(state.onlyWx || state.onlyAddr || state.q || state.plat.size ||
+      state.type.size || state.level || state.fmin !== '' || state.fmax !== '' ||
+      state.salesUnk || state.wxUnk || state.fansUnk || state.hideUnk ||
+      state.track.size || state.cate.size || state.coop.size || state.mark.size ||
+      state.onlyAbn || state.onlyTeam);
+    const cShown = $('#cShown');
+    if (cShown) cShown.classList.toggle('on', filtering);
+  }
+  // 「有微信号」开关
+  $('#cWx').onclick=()=>{ state.onlyWx=!state.onlyWx; state.wxUnk=false; $('#fWxUnk').classList.remove('on'); $('#fWx').classList.toggle('on',state.onlyWx); try{ localStorage.setItem('daren_onlywx', state.onlyWx?'1':'0'); }catch(_){} state.page=1; apply(); };
+  // 「有地址」开关
+  $('#cAddr').onclick=()=>{ state.onlyAddr=!state.onlyAddr; state.page=1; apply(); };
+  // 「当前结果」/「达人总数」→ 一键清空【全部】筛选，回到无任何条件的全量视图
+  //   注意：与「重置」按钮不同 —— 重置会恢复首屏默认（只看有微信号），
+  //   而这两个卡片是"看全量"入口，必须彻底清空，否则用户点了发现还是被筛过。
+  function clearAllFilters(){
+    $('#q').value=''; state.q='';
+    state.plat.clear(); state.type.clear(); state.track.clear();
+    state.cate.clear(); state.coop.clear(); state.mark.clear();
+    state.level=''; state.fmin=''; state.fmax='';
+    state.onlyWx=false; state.onlyAddr=false;
+    state.salesUnk=false; state.wxUnk=false; state.fansUnk=false; state.hideUnk=false;
+    state.onlyAbn=false; state.onlyTeam=false;
+    state.sortKey=-1; state.sortDir=-1; state.page=1;
+    $('#fLevel').value=''; $('#fFansMin').value=''; $('#fFansMax').value='';
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    document.querySelectorAll('.statbtn').forEach(c=>c.classList.remove('on'));
+    MSELS.forEach(([sel,k,ph])=>{ state[k].clear(); syncMsel($(sel), k, ph); });
+    $('#clr').classList.remove('on');
+    // 记住这一选择：以"看全量"为偏好，下次打开也不再默认筛微信号
+    try{ localStorage.setItem('daren_onlywx','0'); }catch(_){}
+    apply();
+  }
+  $('#cShown').onclick=clearAllFilters;
+  $('#cTotal').onclick=clearAllFilters;
   $('#fAbn').onclick=e=>{ state.onlyAbn=!state.onlyAbn; e.target.classList.toggle('on',state.onlyAbn); apply(); };
   $('#fTeam').onclick=e=>{ state.onlyTeam=!state.onlyTeam; e.target.classList.toggle('on',state.onlyTeam); apply(); };
   // 达人赛道 / 带货分类：已改为多选下拉，事件在 initMsel() 里绑定
@@ -3135,6 +3197,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   // ---------- init ----------
   (async function boot(){
     try{
+      // 首屏默认「只看有微信号」——首次访问自动开启；用户手动关过后记住选择
+      //   存储键 daren_onlywx:  '1' = 开启 · '0' = 已关闭 · 无值 = 首次访问
+      (function initDefaultWx(){
+        let pref = null;
+        try{ pref = localStorage.getItem('daren_onlywx'); }catch(_){}
+        state.onlyWx = (pref === null) ? true : (pref === '1');
+        const btn = $('#fWx');
+        if (btn) btn.classList.toggle('on', state.onlyWx);
+      })();
       // 先用本地静态数据渲染，不等网络
       buildFilters(); buildHead(); apply();
       $('#sTotal').textContent=fmt(ALL.length);
