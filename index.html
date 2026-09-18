@@ -263,25 +263,41 @@ td.addr .cpv>span:first-child{white-space:normal;word-break:break-all}
 .unk{display:inline-block;color:#9aa3ae;background:#f2f3f5;border:1px dashed #d9dde2;border-radius:5px;padding:0.5px 7px;font-size:11.5px;font-style:normal}
 /* 单元格操作
    双击任何格子 = 复制（可复制列复制该格；其他列复制整行）
-   悬停可编辑格 = 弹出「✎ 修改 / ＋ 填写」小标签，点它才进编辑态 */
+   悬停可编辑格 = 弹出「⧉ 复制 / ✎ 修改」小菜单，点对应按钮才执行 */
 .filler{width:100%;cursor:copy}
 .fillwrap{position:relative;display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}
 .fillwrap[data-edit]{cursor:pointer}
-/* 悬停标签：贴格子左缘弹出（见 JS 注释：右缘会被下一列遮挡）
-   防误触三件套：
-     ① pointer-events:none —— 标签默认不接收鼠标，鼠标滑过不会误点
-     ② 标签只盖住格子左侧一小块，不侵占相邻列的可点区域
-     ③ 悬停时必须鼠标停在标签上才恢复可点（此时是有意点击，不是误触） */
-.edittip{position:absolute;top:50%;left:-2px;transform:translateY(-50%);z-index:260;
-  display:inline-flex;align-items:center;font-size:11px;line-height:1;padding:4px 8px;border-radius:6px;
-  background:#fff;border:1.5px solid var(--brand);color:var(--brand);font-weight:700;
-  white-space:nowrap;box-shadow:0 3px 12px rgba(20,30,50,.22);cursor:pointer;pointer-events:none;
-  transition:background .12s,color .12s}
-.edittip:hover{background:var(--brand);color:#fff}
-/* 编辑中的格子高亮 */
+/* 悬停高亮当前格 */
 .fillwrap.tipon{background:#eef3fe;border-radius:6px;box-shadow:0 0 0 2px #eef3fe}
-.fillwrap.tipon .edittip{pointer-events:auto;animation:tipin .16s ease-out}
-@keyframes tipin{from{opacity:.4}to{opacity:1}}
+/* 悬停可编辑格时，格内小图标让位（避免「⧉ + 菜单」视觉太挤） */
+.fillwrap.tipon .cp,.fillwrap.tipon .wxval .cp{opacity:0}
+
+/* ========== 悬停弹层（挂到 <html> 下 + position:fixed，脱离表格 overflow 裁剪） ==========
+   设计要点：
+     ① 位置在格子「下方外沿」，绝对不覆盖单元格内容（用户反馈：不能遮挡内容）
+     ② 尺寸小于正文（11px + 紧凑内边距），是辅助控件不是主体（用户反馈：字体占比小一点）
+     ③ 不可见时 pointer-events:none —— 鼠标划过不会误点
+     ④ 弹层朝格子一侧留 10px 透明热区（::before），鼠标从格子移到弹层不丢 hover（用户反馈：别半路消失）
+     ⑤ 两个入口分开：复制 / 修改 —— 想复制不会再点成修改（用户反馈：误触删改） */
+#edittip{position:fixed;z-index:350;display:inline-flex;align-items:stretch;gap:3px;
+  font-size:11px;line-height:1;padding:3px;border-radius:8px;
+  background:#fff;border:1px solid var(--line);box-shadow:0 5px 18px rgba(20,30,50,.20);
+  white-space:nowrap;opacity:0;visibility:hidden;transform:translateY(-3px);
+  transition:opacity .12s,transform .12s,visibility .12s;
+  pointer-events:none;-webkit-user-select:none;user-select:none}
+#edittip.tipon{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+/* 向上留一条透明热区，弥补格子与弹层之间的间隙 */
+#edittip::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px;background:transparent}
+/* 翻转态：弹层在格子上方 */
+#edittip.tipup{transform:translateY(3px)}
+#edittip.tipup.tipon{transform:none}
+#edittip.tipup::before{top:auto;bottom:-10px}
+.edittip button{font:inherit;font-size:11px;line-height:1;font-weight:600;padding:4px 8px;border-radius:6px;
+  border:1px solid transparent;background:#f4f5f7;color:var(--tx2);cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s,border-color .12s}
+.edittip button:hover{background:#e9ebef;border-color:#dfe2e7;color:var(--tx)}
+.edittip button.tipEdit{background:var(--brandbg);color:var(--brand);border-color:#ffd9cd}
+.edittip button.tipEdit:hover{background:var(--brand);border-color:var(--brand);color:#fff}
 /* 就地编辑输入框 */
 .fillinp{width:100%;min-width:92px;box-sizing:border-box;font:inherit;font-size:12px;padding:3px 7px;border:1px solid #5b8def;border-radius:5px;outline:none;background:#fff;color:inherit;box-shadow:0 0 0 3px rgba(91,141,239,.14)}
 .fillinp.numinp{min-width:72px;text-align:right}
@@ -378,7 +394,7 @@ tr.mark-row:hover{background:#fff5f0}
 .pbar{width:230px;height:5px;background:#e6e8ec;border-radius:99px;overflow:hidden}
 .pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .2s}
 
-.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(70px);background:#1c1f23;color:#fff;padding:10px 20px;border-radius:10px;font-size:13.5px;opacity:0;transition:.25s;z-index:300;pointer-events:none;box-shadow:0 8px 26px rgba(0,0,0,.22)}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(70px);background:#1c1f23;color:#fff;padding:10px 20px;border-radius:10px;font-size:13.5px;opacity:0;transition:.25s;z-index:400;pointer-events:none;box-shadow:0 8px 26px rgba(0,0,0,.22)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .nores{padding:60px 20px;text-align:center;color:var(--tx2)}
 .nores b{display:block;font-size:15px;color:var(--tx);margin-bottom:6px}
@@ -568,7 +584,7 @@ tr.mark-row:hover{background:#fff5f0}
     </div>
     <div class="meta-line">
       <span id="hint">输入关键词或筛选条件开始查询</span>
-      <span>💡 双击内容即复制该内容 · 双击本行即复制本行内容 · 鼠标悬停可修改／补充</span>
+      <span>💡 双击内容即复制该内容 · 双击本行即复制本行内容 · 悬停内容可复制／修改</span>
     </div>
   </div>
 
@@ -580,6 +596,7 @@ tr.mark-row:hover{background:#fff5f0}
       <ul class="nlist">
         <li>如果遇到<b>信息不全</b>的内容，请你<b>手动补齐</b>，方便大家，共创佳绩。</li>
         <li><b>双击内容</b>即复制该内容，<b>双击本行</b>即复制本行内容。</li>
+        <li>鼠标<b>悬停</b>在内容上会弹出小菜单，可选择 <b>⧉ 复制</b> 或 <b>✎ 修改</b>；菜单显示在内容下方，不会挡住内容。</li>
         <li>如果需要联系管理员，请添加 <b class="nwx" data-copy="Aries161130" title="点击复制微信号">Aries161130</b> <span class="ncopy">点击复制</span></li>
       </ul>
     </div>
@@ -805,7 +822,12 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
   // ---------- helpers ----------
   const $ = s => document.querySelector(s);
-  const el = (t,c,h) => { const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n; };
+  const el = (t,c,h) => {
+    const n = document.createElement(t);
+    if (c) t === 'span' && c === 'edittip' ? (n.id = 'edittip', n.className = 'edittip') : (n.className = c);
+    if (h != null) n.innerHTML = h;
+    return n;
+  };
   const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt = n => { n=Number(n)||0; return n>=10000 ? (n/10000).toFixed(n>=100000?0:1)+'万' : n.toLocaleString('zh-CN'); };
   const hasWx = r => !!(r[8]||r[9]||r[10]);
@@ -1923,52 +1945,111 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   //  可修改范围：除「达人昵称」「达人UID」外的所有列
   // ============================================================
   let filling   = false;   // 是否处于编辑态
-  let hoverT    = null;    // 悬停弹出标签的延迟
-  let toolWrap  = null;    // 当前显示提示标签的格子
-  let toolMoved = null;    // 标签弹出期间被临时收走的 data-copy（防误触）
+  let hoverT    = null;    // 悬停弹出菜单的延迟
+  let hideT     = null;    // 移出后收起菜单的延迟（给鼠标一条「从格子走到菜单」的路）
+  let toolWrap  = null;    // 当前显示提示菜单的格子
+  let toolTip   = null;    // 当前显示的菜单节点
   let curSession = null;   // 当前编辑会话
 
-  // 创建「修改内容」标签
-  //  位置：贴在格子左缘（见 CSS 注释：右缘会被下一列盖住 = 用户反馈的「遮挡」）
+  // 创建「复制 / 修改」小菜单
+  //  位置：格子下方外沿（CSS top:calc(100% + 1px)），不覆盖任何单元格内容
+  //  两个入口分开：复制走剪贴板，修改走编辑态 —— 想复制不会再误点成修改
+  //  注意：不再收走 data-copy。悬停只负责弹菜单，不影响双击复制的判定
   function showTool(wrap){
     if (filling || !wrap) return;   // 编辑态由 mouseover 先 restore 再进来
+    // 同一个格子已经在显示菜单 → 什么都不做。
+    //  否则重复触发（多次 mouseover / 定时器叠加）会先 hideTool 收掉旧菜单再重建，
+    //  用户看到的是「弹了一下又没了」。
+    if (toolWrap === wrap && toolTip && toolTip.isConnected) return;
     hideTool();
-    // 防误触 A：标签弹出期间把「本格 + 格内所有后代」的 data-copy 全部收走。
-    //  必须用 querySelectorAll('*') 把 wrap 自己也算进来 —— 只查后代的话，
-    //  wrap 自身的 data-copy 还在，而标签恰恰覆盖在 wrap 的区域上，
-    //  用户点标签时事件目标落到 wrap → 触发复制（这就是用户反馈的误触）。
-    //  用 getAttribute/setAttribute 原样存取：dataset 会把空串读成 undefined，
-    //  还原时会写出字面量 "undefined"。
-    toolMoved = [];
-    [wrap].concat([...wrap.querySelectorAll('*')]).forEach(node=>{
-      const raw = node.getAttribute && node.getAttribute('data-copy');
-      if (raw == null) return;
-      toolMoved.push([node, raw]);
-      node.removeAttribute('data-copy');
-    });
-    // 已有内容的格子用「✎ 修改」，空白格用「＋ 填写」——一眼区分动作，防误改
+
     const isBlank = !!wrap.querySelector('.unkfill');
-    const tip = el('span','edittip', isBlank ? '＋ 填写' : '✎ 修改');
-    wrap.appendChild(tip);
-    wrap.classList.add('tipon');
-    toolWrap = wrap;
-    tip.addEventListener('click', ev=>{
+    const tip = el('span','edittip');
+    const bCopy = el('button','tipCopy', '⧉ 复制');
+    const bEdit = el('button','tipEdit', isBlank ? '＋ 填写' : '✎ 修改');
+    tip.appendChild(bCopy);
+    tip.appendChild(bEdit);
+
+    // 复制：优先取本格的原始值；空格子（data-copy=""）退化为复制整行
+    bCopy.addEventListener('click', async ev=>{
       ev.preventDefault(); ev.stopPropagation();
+      const raw = wrap.getAttribute('data-copy');
+      const tr  = wrap.closest('tr[data-rowcopy]');
+      if (raw != null && String(raw).trim()){
+        const val = String(raw).trim();
+        const ok = await copyText(val);
+        flashCopied(wrap);
+        if (ok) toast('已复制：'+(val.length>26 ? val.slice(0,26)+'…' : val));
+        else toast('复制失败，请长按/右键选择复制','err');
+      } else if (tr && tr.dataset.rowcopy){
+        const ok = await copyText(tr.dataset.rowcopy);
+        flashCopied(wrap);
+        if (ok) toast('已复制该达人全部信息（'+tr.dataset.rowcopy.split('\n').length+' 项）');
+        else toast('复制失败，请长按/右键选择复制','err');
+      } else {
+        toast('该格没有可复制的内容');
+      }
+      hideTool();
+    });
+    // 修改：进入编辑态
+    bEdit.addEventListener('click', ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      hideTool();
       beginEdit(wrap);
     });
-    // 标签自身的 mousedown 不该被 mouseout 逻辑当成"离开格子"处理
+    // 菜单自身的按下不该被 mouseout 当成「离开了格子」
     tip.addEventListener('mousedown', ev=>{ ev.preventDefault(); ev.stopPropagation(); });
+
+    wrap.classList.add('tipon');
+    document.documentElement.appendChild(tip);   // 挂到 <html> 下，脱离表格的 overflow 裁剪
+    tip.classList.add('tipon');                  // 弹层自身的显示开关（#edittip.tipon）
+    toolWrap = wrap;
+    toolTip  = tip;
+    // 先量一次再定位：尺寸为 0 时（刚插入、尚未布局）不翻转，避免误判成「上方没空间」
+    const m = measureTip(tip);
+    placeTip(wrap, tip, m);
+    // 首次布局后尺寸才准，下一帧再定位一次（否则第一次弹会偏）
+    requestAnimationFrame(()=>{ if (toolTip === tip) placeTip(wrap, tip); });
+  }
+  // 量弹层的真实尺寸；未完成布局时返回 0（调用方据此跳过翻转判断）
+  //  先移出视口再量，避免在当前位置产生「内容溢出抖动」
+  function measureTip(tip){
+    const pl = tip.style.left, pt = tip.style.top;
+    tip.style.left = '-9999px';
+    tip.style.top = '0px';
+    const w = tip.offsetWidth || 0, h = tip.offsetHeight || 0;
+    tip.style.left = pl;
+    tip.style.top = pt;
+    return { w, h };
+  }
+  // 把浮层贴到格子的「下方外沿」
+  //  弹层挂在 <html> 下且 position:fixed，用视口坐标即可，且不会被表格 overflow 剪掉
+  //  翻转规则：只有当「下方真的放不下」时才翻到上方。
+  //  绝不用 r.top 去猜上边距 —— 量不到尺寸或视口高度异常时会误翻，把弹层顶到视口外。
+  function placeTip(wrap, tip, m){
+    if (!wrap || !tip || !wrap.isConnected) return;
+    const r = wrap.getBoundingClientRect();
+    const size = m || measureTip(tip);
+    const w = size.w || 0;
+    const h = size.h || 28;
+    const vh = window.innerHeight || 800;
+    let left = r.left - 1;
+    left = Math.max(6, w ? Math.min(left, window.innerWidth - w - 6) : left);
+    // 下方剩余空间够 → 向下（默认，绝不遮挡内容）；不够才向上
+    const below = vh - r.bottom;
+    const above = below < h + 10 && r.top > h + 10;
+    tip.classList.toggle('tipup', above);
+    tip.style.left = left + 'px';
+    tip.style.top = (above ? r.top - h - 5 : r.bottom + 4) + 'px';
   }
   function hideTool(){
-    // 还原被收走的 data-copy
-    if (toolMoved){
-      toolMoved.forEach(([node,val])=>{ if (node && node.isConnected) node.setAttribute('data-copy', val); });
-      toolMoved = null;
+    clearTimeout(hideT);
+    if (toolTip){
+      if (toolTip.isConnected) toolTip.remove();
+      toolTip = null;
     }
     if (toolWrap){
       toolWrap.classList.remove('tipon');
-      const t = toolWrap.querySelector('.edittip');
-      if (t) t.remove();
       toolWrap = null;
     }
   }
@@ -2120,13 +2201,35 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if (!isSel) inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if (filling && curSession && curSession.wrap===w) restore(); }, 160); });
   }
 
-  // 悬停可编辑格子 → 延迟弹出「修改内容」标签
+  // 悬停可编辑格子 → 延迟弹出「复制 / 修改」小菜单
+  //  延迟 260ms：鼠标「划过」不会闪出菜单，只有「停下来」才弹
+  function inTip(node){
+    if (!node || node.nodeType !== 1) return false;
+    if (node.closest && node.closest('#edittip')) return true;
+    const t = $('#edittip');
+    return !!(t && node === t);
+  }
+  // 鼠标是否已经落在弹层上
+  //  用 document.elementFromPoint 判断「光标下是不是弹层」。
+  //  注意：不能把「取不到结果」当成「不在弹层上」—— 那样任何一次测量失败都会把弹层收掉。
+  //  只有明确命中其它元素时才认为鼠标离开了弹层。
+  function pointerOnTip(){
+    const t = $('#edittip');
+    if (!t || !t.classList.contains('tipon')) return false;
+    const r = t.getBoundingClientRect();
+    if (!r || !r.width || !r.height) return false;
+    if (typeof document.elementFromPoint !== 'function') return false;
+    const hit = document.elementFromPoint(r.left + Math.min(8, r.width / 2), r.top + r.height / 2);
+    return !!(hit && (hit === t || (hit.closest && hit.closest('#edittip'))));
+  }
   document.addEventListener('mouseover', e=>{
     const wrap = e.target.closest('.fillwrap[data-edit]');
     if (!wrap) return;
     if (toolWrap === wrap) return;
-    // 在格子内子元素之间移动 → 不重置
+    // 在格子内子元素之间移动（含移到菜单上）→ 不重置
     if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+    // 鼠标从菜单本身移出来（例如从按钮移到菜单边缘）→ 也不重置
+    if (inTip(e.relatedTarget)) return;
 
     // 已有一个格子处于编辑态、鼠标又移到别的格子上 → 自动收掉旧的编辑框，
     // 否则用户必须按 Esc 才能改下一格，操作很卡。
@@ -2137,18 +2240,41 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       } else return;
     }
 
+    clearTimeout(hideT);          // 换目标了，取消待执行的收起
     clearTimeout(hoverT);
-    hoverT = setTimeout(()=>showTool(wrap), 180);
+    hoverT = setTimeout(()=>showTool(wrap), 260);
   });
 
-  // 鼠标移出 → 收起标签
+  // 鼠标移出 → 延迟收起菜单
+  //  弹层自带 10px 透明热区 + 160ms 缓冲，鼠标「格子 → 弹层」这一路不会断
   document.addEventListener('mouseout', e=>{
     const wrap = e.target.closest('.fillwrap[data-edit]');
     if (!wrap) return;
+    // 目标还在格子内部 → 不收起
     if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+    // 目标就是弹层本身（极少见，弹层不在格子里）→ 不收起
+    if (inTip(e.relatedTarget)) return;
     clearTimeout(hoverT);
-    if (toolWrap === wrap) hideTool();
+    if (toolWrap === wrap){
+      clearTimeout(hideT);
+      // 延时收起；期间若鼠标落到弹层上则作废（给「格子 → 弹层」留出移动时间）
+      hideT = setTimeout(()=>{ if (!pointerOnTip()) hideTool(); }, 180);
+    }
   });
+  // 鼠标滑过弹层 → 取消待执行的收起（确保「格子 → 弹层」这一路不断）
+  document.documentElement.addEventListener('mouseover', e=>{
+    if (!inTip(e.target)) return;
+    clearTimeout(hideT);
+  }, true);
+  // 弹层自身的 mouseenter（弹层不在格子里，需要单独续命）
+  document.documentElement.addEventListener('mouseenter', e=>{
+    if (!inTip(e.target)) return;
+    clearTimeout(hideT);
+  }, true);
+
+  // 滚轮滚动时弹层跟着走
+  document.addEventListener('wheel', ()=>{ if (toolWrap && toolTip) placeTip(toolWrap, toolTip); }, {passive:true});
+  window.addEventListener('resize', ()=>{ if (toolWrap && toolTip) placeTip(toolWrap, toolTip); });
 
   // 编辑态中途滚动 / 重绘 → 收尾
   window.addEventListener('scroll', ()=>{ hideTool(); if (filling && curSession) curSession.restore(); }, true);
