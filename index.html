@@ -183,7 +183,7 @@ select:focus,.numin:focus{border-color:var(--brand)}
 .impmap .cpbadge{display:inline-block;background:#e6f1ff;color:#0b5cad;border:1px solid #c7e0ff;
   border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600;line-height:1.4}
 
-/* ---------- 快捷粘贴录入 ---------- */
+/* ---------- 便捷导入 ---------- */
 .pastebox{width:100%;min-height:190px;max-height:340px;border:1.5px solid var(--line);border-radius:10px;
   padding:12px 14px;font-size:13.5px;font-family:ui-monospace,Consolas,'Microsoft YaHei',monospace;
   line-height:1.85;outline:none;resize:vertical;background:#fff;color:var(--tx)}
@@ -449,7 +449,7 @@ tr.mark-row:hover{background:#fff5f0}
       <button class="clr" id="clr" title="清空">✕</button>
     </div>
     <button class="btn" id="reset">重置</button>
-    <button class="btn primary" id="pasteBtn" title="把聊天里复制的内容直接粘进来，自动识别">⚡ 快捷粘贴</button>
+    <button class="btn primary" id="pasteBtn" title="把聊天里复制的内容直接粘进来，自动识别">⚡ 便捷导入</button>
     <button class="btn" id="newBtn">+ 录入达人</button>
     <button class="btn" id="impBtn">⇪ 导入表格</button>
     <button class="btn primary" id="exportBtn">导出结果</button>
@@ -3377,7 +3377,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   const PATCH_KEYS = ['wx1','wx2','wx3','phone','receiver','address'];
 
   // ============================================================
-  //  快捷粘贴解析：把杂乱的聊天内容解析成结构化达人条目
+  //  便捷导入解析：把杂乱的聊天内容解析成结构化达人条目
   // ============================================================
   //  用户实际粘贴的内容长这样（千奇百怪，必须宽容）：
   //    抖短 夕阳手工美食 Sx11111 13888888888          ← 单行空格分隔
@@ -3749,20 +3749,16 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   }
 
   // ---------- 粘贴板弹层 ----------
-  //  入口：头部「⚡ 快捷粘贴」按钮
+  //  入口：头部「⚡ 便捷导入」按钮
   function openPaste(){
     if (!$('#pasteModal')){
       const m = document.createElement('div');
       m.className = 'modal'; m.id = 'pasteModal';
       m.innerHTML =
         '<div class="mbox wide" style="max-width:820px">'+
-          '<div class="mhead"><b>⚡ 快捷粘贴录入</b><button class="mclose" id="pasteClose">✕</button></div>'+
+          '<div class="mhead"><b>⚡ 便捷导入</b><button class="mclose" id="pasteClose">✕</button></div>'+
           '<div class="mbody" id="pasteBody">'+
-            '<div class="mnote">把内容粘进来就行，<b>格式不用整理</b>。<br>'+
-              '认得出这些写法：<code>抖短 夕阳手工美食 Sx11111 13888888888</code>　'+
-              '<code>①平台：视频号 ②达人：高娜丽美食记 ③微信：lkq1777888</code>　'+
-              '<code>达人昵称：xx ＋ 微信号：yy（换行）</code><br>'+
-              '多行会拆成多条；昵称相同的会自动并入已有记录的联系方式列（微信1→2→3）。</div>'+
+            '<div class="mnote">把内容粘进来就行，<b>格式不用整理</b>。</div>'+
             '<textarea id="pasteIn" class="pastebox" placeholder="在这里粘贴…&#10;&#10;抖短 夕阳手工美食 Sx11111 13888888888&#10;①平台：视频号&#10;②达人：高娜丽美食记&#10;③微信：lkq1777888"></textarea>'+
             '<div id="pastePrev" class="pasteprev"></div>'+
           '</div>'+
@@ -3837,6 +3833,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     const list = window.__pasteList || [];
     if (!list.length) return;
     const btn = $('#pasteGo'); btn.disabled = true;
+    // 不关弹窗 → 必须保证任何出口都恢复按钮可用，否则卡死没法继续录
+    const restoreBtn = () => { const b = $('#pasteGo'); if (b) b.disabled = false; };
     const setT = m => { $('#pasteTip').textContent = m; };
     let added = 0, merged = 0, skipped = 0, failed = 0;
 
@@ -3938,14 +3936,22 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     }
 
     setT('');
-    closePaste();
+    // 用户决定：确认录入后不关闭弹窗，清空内容停在「等待粘贴」界面，方便连续录入
+    const ta = $('#pasteIn');
+    if (ta){ ta.value = ''; }
+    const pv = $('#pastePrev'); if (pv) pv.innerHTML = '';
+    restoreBtn();
+    window.__pasteList = [];
+    if (ta) ta.focus();
     apply();
     const parts = [];
     if (added)   parts.push('新增 ' + added + ' 位');
     if (merged)  parts.push('并入已有 ' + merged + ' 位');
     if (skipped) parts.push('跳过 ' + skipped + ' 位（信息已存在）');
     if (failed)  parts.push('失败 ' + failed + ' 位');
-    toast('快捷录入完成：' + (parts.join('，') || '无变化'));
+    const doneMsg = '便捷导入完成：' + (parts.join('，') || '无变化');
+    toast(doneMsg);
+    setT('✓ ' + doneMsg + '　可继续粘贴下一条');
   }
 
   function openEntry(prefill, mode, target){
@@ -4144,7 +4150,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
   document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ closeModal(); closeImp(); closeMarkPick(); if (typeof closePaste==='function') closePaste(); } });
 
-  // 快捷粘贴录入
+  // 便捷导入
   $('#pasteBtn').onclick = openPaste;
 
   // 导入表格
