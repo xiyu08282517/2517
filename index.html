@@ -366,6 +366,10 @@ td.cent{text-align:center;white-space:nowrap}
 .abn-add.markadd:hover{color:#8a6100;border-color:#f0cf75;background:#fffbeb}
 .team{display:inline-block;background:#eef4ff;color:#2f6fed;border:1px solid #d6e4ff;border-radius:6px;
      padding:2px 8px;font-size:11px;font-weight:600;cursor:help;white-space:nowrap}
+/* 手工团标识：团（红）/ 矩阵（紫）/ 寄样点（灰绿）—— 与自动判定的蓝色区分 */
+.team.tm-team{background:#fdeaea;color:#c62828;border-color:#f5c2c2}
+.team.tm-matrix{background:#f3edff;color:#6b3fd4;border-color:#e0d3ff}
+.team.tm-station{background:#eef7f0;color:#2e7d4f;border-color:#cfe9d8}
 tr.row-abn{background:#fff6f6}
 tr.row-abn:hover{background:#ffeeee}
 tr.row-team td.teamtd{background:#f7faff}
@@ -699,15 +703,18 @@ tr.mark-row:hover{background:#fff5f0}
   </div>
 </div>
 
-<script src="data/meta.js"></script>
-<script src="data/config.js"></script>
-<script src="data/part00.js"></script>
 <script>
 // ---------- chunk loader ----------
+// ★ 必须排在所有 data/partNN.js 之前：外部脚本按文档顺序同步执行，
+//   任何在 __CHUNK__ 定义前加载的分片都会被静默丢弃。
 window.__CHUNKS__ = [];
 window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 </script>
+<script src="data/meta.js"></script>
+<script src="data/config.js"></script>
+<script src="data/part00.js"></script>
 <script src="data/part01.js"></script>
+<script src="data/part11.js"></script>
 <script src="data/part02.js"></script>
 <script src="data/part03.js"></script>
 <script src="data/part04.js"></script>
@@ -834,8 +841,20 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       }
     });
   }
-  const isTeam = r => { buildTeamIndex(); return _teamSet.has(r); };
+  const isTeam = r => {
+    // ① 手工标（字段19，落库的新数据）优先
+    const man = isUnk(r[19]) ? '' : String(r[19]).trim();
+    if (man) return true;
+    // ② 兜底：自动统计
+    buildTeamIndex(); return _teamSet.has(r);
+  };
   const teamInfo = r => { buildTeamIndex(); return _teamInfo.get(r) || null; };
+  // 手工标（团/矩阵/寄样点）—— 落库数据自带，优先于自动判定
+  const TEAM_MANUAL_CLS = {'团':'tm-team','矩阵':'tm-matrix','寄样点':'tm-station'};
+  const teamManual = r => {
+    const m = isUnk(r[19]) ? '' : String(r[19]).trim();
+    return TEAM_MANUAL_CLS[m] ? m : '';
+  };
 
   const state = {q:'', plat:new Set(), type:new Set(), level:'', fmin:'', fmax:'', onlyWx:false,
                  salesUnk:false, wxUnk:false, fansUnk:false, hideUnk:false,
@@ -1612,6 +1631,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
 
   // 团标识单元格
   function teamCell(r){
+    // ① 手工标优先（团 / 矩阵 / 寄样点）
+    const man = teamManual(r);
+    if (man){
+      const tipM = man === '团'   ? '同一主体运营多个账号（人工确认）'
+                 : man === '矩阵' ? '同一公司/MCN 多矩阵号（人工确认）'
+                 :                  '共用代收地址，非真团（人工确认）';
+      return '<span class="team '+TEAM_MANUAL_CLS[man]+'" title="'+tipM+'">👥 '+man+'</span>';
+    }
+    // ② 兜底：自动统计
     const ti = teamInfo(r);
     if (!ti) return '<span style="color:#cdd3da">—</span>';
     const parts = [];
@@ -2640,7 +2668,14 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     cleanNick: cleanNickBrackets,
     noise: isNoiseLine,
     platStrict: guessPlatformStrict,
-    addr: parseAddrBlock
+    addr: parseAddrBlock,
+    // 数据/状态出口 —— 供 jsdom 核验脚本核对「表格里到底渲染了什么」
+    ALL: () => ALL,
+    state: () => state,
+    apply: () => apply(),
+    isTeam: isTeam,
+    teamManual: teamManual,
+    teamCell: teamCell
   };
 
   // 无结果时的两个动作（事件委托，因为按钮是动态生成的）
