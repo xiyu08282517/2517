@@ -201,10 +201,11 @@ select:focus,.numin:focus{border-color:var(--brand)}
   border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
 .mnote code{background:#fff;border:1px solid #d6e4ff;border-radius:5px;padding:1px 6px;
   font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#2b5cbf;white-space:nowrap}
-.impprev{overflow:auto;max-height:250px;border:1px solid var(--line);border-radius:9px}
+.impprev{overflow:auto;max-height:320px;border:1px solid var(--line);border-radius:9px}
 .impprev table{border-collapse:collapse;font-size:12px;min-width:100%}
 .impprev th{background:#f7f8fa;color:var(--tx2);font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
 .impprev td{padding:6px 10px;border-bottom:1px solid var(--line2);white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.impprev td:nth-child(7){max-width:260px}
 .impprev tr:last-child td{border-bottom:0}
 .impsep{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-size:12.5px;font-weight:600;color:var(--tx2)}
 .impsep::after{content:'';flex:1;height:1px;background:var(--line2)}
@@ -3988,7 +3989,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     $('#pasteGo').disabled = false;
     let html = '<div class="impsep">解析结果（'+list.length+' 条）</div>';
     html += '<div class="impprev"><table><thead><tr>'+
-      '<th>平台</th><th>昵称</th><th>微信号</th><th>手机号</th><th>等级</th><th>类目</th><th>合作模式</th><th>处理方式</th>'+
+      '<th>平台</th><th>昵称</th><th>达人UID</th><th>微信号</th><th>手机号</th><th>收货人</th><th>收货地址</th><th>等级</th><th>类目</th><th>合作模式</th><th>处理方式</th>'+
     '</tr></thead><tbody>';
     list.forEach(e=>{
       const hit = findSameCreator(e.nickname, [e.wx1,e.wx2,e.wx3], e.phone);
@@ -4006,11 +4007,18 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       const wxCol = wxs.length ? wxs.map(w=>esc(w)).join('　') : '<span style="color:var(--tx3)">未知</span>';
       const cateCol = e.cate ? esc(e.cate) : '<span style="color:var(--tx3)">—</span>';
       const coopCol = e.coop ? '<span class="coopbadge">'+esc(e.coop)+'</span>' : '<span style="color:var(--tx3)">—</span>';
+      const dash = '<span style="color:var(--tx3)">—</span>';
+      const uidCol  = e.uid ? '<span style="font-size:11.5px">'+esc(e.uid)+'</span>' : dash;
+      const recvCol = e.receiver ? esc(e.receiver) : dash;
+      const addrCol = e.address ? '<span style="font-size:11.5px">'+esc(e.address)+'</span>' : dash;
       html += '<tr>'+
         '<td>'+esc(e.platform||'—')+'</td>'+
         '<td>'+esc(e.nickname||'—')+'</td>'+
+        '<td>'+uidCol+'</td>'+
         '<td style="font-size:11.5px">'+wxCol+'</td>'+
         '<td>'+esc(e.phone||'—')+'</td>'+
+        '<td>'+recvCol+'</td>'+
+        '<td>'+addrCol+'</td>'+
         '<td>'+esc(e.clevel||'—')+'</td>'+
         '<td style="font-size:11.5px">'+cateCol+'</td>'+
         '<td>'+coopCol+'</td>'+
