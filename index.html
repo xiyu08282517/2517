@@ -257,6 +257,7 @@ td.addr .cpv>span:first-child{white-space:normal;word-break:break-all}
 /* 单元格操作
    双击任何格子 = 复制（可复制列复制该格；其他列复制整行）
    悬停可编辑格 = 弹出「✎ 修改 / ＋ 填写」小标签，点它才进编辑态 */
+.filler{width:100%;cursor:copy}
 .fillwrap{position:relative;display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}
 .fillwrap[data-edit]{cursor:pointer}
 /* 悬停标签：贴格子左缘弹出（见 JS 注释：右缘会被下一列遮挡）
@@ -470,6 +471,21 @@ tr.mark-row:hover{background:#fff5f0}
       </div>
       <div class="fdiv"></div>
       <div class="fgroup">
+        <label>达人标记</label>
+        <div class="msel" id="msMark">
+          <button type="button" class="mselbtn" data-msel-btn><span class="mseltxt">全部标记</span><i class="mselar">▾</i></button>
+          <div class="mselpop" data-msel-pop>
+            <div class="mselhead">
+              <input type="text" class="mselsearch" data-msel-search placeholder="搜索标记…">
+              <button type="button" class="mselall" data-msel-all>全选</button>
+              <button type="button" class="mselnone" data-msel-none>清空</button>
+            </div>
+            <div class="msellist" data-msel-list></div>
+          </div>
+        </div>
+      </div>
+      <div class="fdiv"></div>
+      <div class="fgroup">
         <label>带货分类</label>
         <div class="msel" id="msCate">
           <button type="button" class="mselbtn" data-msel-btn><span class="mseltxt">全部分类</span><i class="mselar">▾</i></button>
@@ -540,7 +556,7 @@ tr.mark-row:hover{background:#fff5f0}
     </div>
     <div class="meta-line">
       <span id="hint">输入关键词或筛选条件开始查询</span>
-      <span>💡 双击任意信息即可复制 · 鼠标悬停可修改／补充</span>
+      <span>💡 双击内容即复制该内容 · 双击本行即复制本行内容 · 鼠标悬停可修改／补充</span>
     </div>
   </div>
 
@@ -551,6 +567,7 @@ tr.mark-row:hover{background:#fff5f0}
       <div class="ntitle">公告</div>
       <ul class="nlist">
         <li>如果遇到<b>信息不全</b>的内容，请你<b>手动补齐</b>，方便大家，共创佳绩。</li>
+        <li><b>双击内容</b>即复制该内容，<b>双击本行</b>即复制本行内容。</li>
         <li>如果需要联系管理员，请添加 <b class="nwx" data-copy="Aries161130" title="点击复制微信号">Aries161130</b> <span class="ncopy">点击复制</span></li>
       </ul>
     </div>
@@ -1082,18 +1099,25 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     //  重要：选项来源是「枚举定义 + 数据里出现过的值」，不是只取数据里出现过的。
     //  本地 5 万条这些列全是空的（属云端增量列），若只统计数据，
     //  用户会发现「纯佣 / 投流」一个都选不到 —— 枚举项必须恒常可见。
-    const cntT={}, cntC={}, cntP={};
+    const cntT={}, cntC={}, cntP={}, cntM={};
     ALL.forEach(r=>{
       const t=isUnk(r[14])?UNK:r[14], c=isUnk(r[15])?UNK:r[15], p=isUnk(r[16])?UNK:r[16];
+      // 达人标记：空值归入「无标记」，与 matches() 的判定保持一致
+      const mk=isUnk(r[17])?NOMARK:String(r[17]).trim();
       cntT[t]=(cntT[t]||0)+1; cntC[c]=(cntC[c]||0)+1; cntP[p]=(cntP[p]||0)+1;
+      cntM[mk]=(cntM[mk]||0)+1;
     });
     // 枚举项补 0 计数，保证一定渲染出来
     TRACKS.forEach(k=>{ if(!(k in cntT)) cntT[k]=0; });
     CATES .forEach(k=>{ if(!(k in cntC)) cntC[k]=0; });
     COOPS .forEach(k=>{ if(!(k in cntP)) cntP[k]=0; });
+    MARKS .forEach(k=>{ if(!(k in cntM)) cntM[k]=0; });
+    if(!(NOMARK in cntM)) cntM[NOMARK]=0;
     buildMsel($('#msTrack'), TRACKS.concat([UNK]), cntT, 'track', '全部赛道');
     buildMsel($('#msCate'),  CATES.concat([UNK]),  cntC, 'cate',  '全部分类');
     buildMsel($('#msCoop'),  COOPS.concat([UNK]),  cntP, 'coop',  '全部合作类型');
+    // 达人标记：固定 3 项（无标记 / 预算达人 / 稿费达人），不出现「未知」
+    buildMsel($('#msMark'),  MARKS.concat([NOMARK]), cntM, 'mark', '全部标记');
   }
 
   // ---------- 多选下拉：填充选项 + 交互 ----------
@@ -1157,7 +1181,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   const MSELS = [
     ['#msCoop',  'coop',  '全部合作类型'],
     ['#msTrack', 'track', '全部赛道'],
-    ['#msCate',  'cate',  '全部分类']
+    ['#msCate',  'cate',  '全部分类'],
+    ['#msMark',  'mark',  '全部标记']
   ];
 
   // 多选下拉的全局交互（开合 / 搜索 / 全选 / 清空）
@@ -1618,8 +1643,9 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
           }
           return '<td></td>';
         };
-        tr.innerHTML = COLS.map(cellOf).join('');
-        // 整行复制：双击任意行 = 复制该达人全部信息（纯文本，便于贴给对方）
+        // 末尾追加一个占位 td：扩大「空余地方」的可双击面积，便于复制整行
+        tr.innerHTML = COLS.map(cellOf).join('') + '<td class="filler" title="双击此处复制该达人整行信息"></td>';
+        // 整行复制：双击本行空余地方 = 复制该达人全部信息（纯文本，便于贴给对方）
         tr.dataset.nick = r[1] || '';
         tr.dataset.rowcopy = [
           '昵称：'+(r[1]||''),
@@ -1686,7 +1712,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   $('#clr').onclick=()=>{ $('#q').value=''; state.q=''; $('#clr').classList.remove('on'); apply(); };
   $('#reset').onclick=()=>{
     $('#q').value=''; state.q=''; state.plat.clear(); state.type.clear();
-    state.track.clear(); state.cate.clear(); state.coop.clear();
+    state.track.clear(); state.cate.clear(); state.coop.clear(); state.mark.clear();
     state.level=''; state.fmin=''; state.fmax=''; state.onlyWx=false;
     state.salesUnk=false; state.wxUnk=false; state.fansUnk=false; state.hideUnk=false;
     state.onlyAbn=false; state.onlyTeam=false;
@@ -1778,42 +1804,35 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if (e.target.closest('button,a,select,input')) return;
     // 防误触：编辑态下的双击一律忽略（输入框内的双击是选词，不是复制）
     if (filling) return;
+    // 悬停输入标签本身：点它是进入编辑，不复制
+    if (e.target.closest('.edittip')) return;
 
-    // ① 可复制格 → 只复制这一格
-    //    data-copy 是权威来源（渲染时就写好了原始值），
-    //    不从 r[di] 反查 —— 粉丝/销量那两格显示的是格式化值，反查会绕晕。
+    const tr2 = e.target.closest('tr[data-rowcopy]');
+    if (!tr2) return;
+
+    // ── 分区规则 ──────────────────────────────────────────
+    //  ① 双击「具体内容」格 → 只复制该格内容
+    //     判据：命中 .fillwrap[data-copy] 且 data-copy 非空
+    //  ② 双击「本行空余地方」 → 复制整行全部信息
+    //     即 td 内 .fillwrap 之外的空白区、或没有 data-copy 的格
+    // ────────────────────────────────────────────────────
     const w = e.target.closest('.fillwrap[data-copy]');
     if (w){
       const val = String(w.getAttribute('data-copy') || '').trim();
-      if (!val){
-        toast('这一格是空的，鼠标停一下即可填写');
+      if (val){
+        // 有内容 → 复制这一格
+        const ok1 = await copyText(val);
         flashCopied(w);
+        if (ok1){
+          const short = val.length > 26 ? val.slice(0,26)+'…' : val;
+          toast('已复制：'+short);
+        } else toast('复制失败，请长按/右键选择复制', 'err');
         return;
       }
-      const ok = await copyText(val);
-      flashCopied(w);
-      if (ok){
-        const short = val.length > 26 ? val.slice(0,26)+'…' : val;
-        toast('已复制：'+short);
-      } else toast('复制失败，请长按/右键选择复制', 'err');
-      return;
+      // 空格子 → 落到整行复制（空格本身没内容可复制）
     }
 
-    // ② 昵称 → 复制昵称本人
-    const nk = e.target.closest('.nickv[data-copy]');
-    if (nk){
-      const nv = String(nk.dataset.copy||'').trim();
-      if (nv){
-        const ok = await copyText(nv);
-        flashCopied(nk);
-        if (ok) toast('已复制：'+(nv.length>26?nv.slice(0,26)+'…':nv));
-        return;
-      }
-    }
-
-    // ③ 其他位置（UID / 异常 / 团标识）→ 复制整行
-    const tr2 = e.target.closest('tr[data-rowcopy]');
-    if (!tr2) return;
+    // ② 空余地方 → 复制整行
     const rv = tr2.dataset.rowcopy;
     if (!rv) return;
     const ok2 = await copyText(rv);
@@ -1829,27 +1848,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     setTimeout(()=>el.classList.remove('copied'), 620);
   }
 
-  // 点击昵称 → 复制昵称
-  document.addEventListener('click', async e=>{
-    const w = e.target.closest('.nickv[data-copy]');
-    if (!w) return;
-    e.preventDefault(); e.stopPropagation();
-    const v = w.dataset.copy;
-    const ok = await copyText(v);
-    flashCopied(w);
-    if (ok){
-      const short = String(v).length > 26 ? String(v).slice(0,26)+'…' : v;
-      toast('已复制：'+short);
-    } else {
-      toast('复制失败，请长按/右键选择复制', 'err');
-    }
-  });
+  // 注：单击不触发复制。复制统一走「双击整行」（见下方 dblclick）
+  //     早期版本单击昵称会复制昵称，会与双击整行冲突，已移除。
 
   // ============================================================
   //  单元格交互（最终规则）
-  //    双击任何格子 → 复制（可编辑列复制该格；其他列复制整行）
-  //    鼠标悬停     → 弹出「修改内容」小标签（只读列不弹）
-  //    点小标签     → 原地变输入框 → 粘贴 → 回车提交
+  //    双击「具体内容」 → 复制该格内容
+  //    双击「空余地方」 → 复制该达人整行全部信息
+  //    鼠标悬停         → 弹出「修改内容」小标签（只读列不弹）
+  //    点小标签         → 原地变输入框 → 粘贴 → 回车提交
   //  可修改范围：除「达人昵称」「达人UID」外的所有列
   // ============================================================
   let filling   = false;   // 是否处于编辑态
@@ -2830,8 +2837,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
               const newV = String(o[k]||'').trim();
               if (!oldV && newV) patch[k] = newV;   // 只在原值为空时才补
             });
-            ['track','cate'].forEach(k=>{
-              const oldV = hit ? String(hit[EX[k === 'track' ? 'track' : 'cate']]||'').trim() : '';
+            ['track','cate','coop','mark'].forEach(k=>{
+              const oldV = hit ? String(hit[EX[k]]||'').trim() : '';
               if (!oldV && o[k]) patch[k] = o[k];
             });
             if (Object.keys(patch).length === 0){ noChange++; continue; }
