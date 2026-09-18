@@ -196,6 +196,9 @@ select:focus,.numin:focus{border-color:var(--brand)}
   border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
 .pasteprev .badge-skip{background:#f2f3f5;color:var(--tx3);border:1px solid var(--line2);
   border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
+/* 合作模式徽标（预览表用） */
+.pasteprev .coopbadge{display:inline-block;background:#eef4ff;color:#1a4fa0;border:1px solid #cfe0ff;
+  border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap}
 .mnote code{background:#fff;border:1px solid #d6e4ff;border-radius:5px;padding:1px 6px;
   font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#2b5cbf;white-space:nowrap}
 .impprev{overflow:auto;max-height:250px;border:1px solid var(--line);border-radius:9px}
@@ -746,10 +749,11 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     '颜值美妆','美食吃播','厨房做菜','运动健身','知识技能','生活Vlog',
     '搞笑剧情','宝妈亲子','游戏音乐','三农特产','其他类型'
   ];
-  // ② 带货分类（品类向）—— 粗口径 10 项
+  // ② 带货分类（品类向）—— 粗口径 10 项 + 「全品类」（表示全类目都做）
   const CATES = [
     '食品饮料','美妆个护','母婴用品','家居日用','服饰鞋包',
-    '生鲜果蔬','保健养生','数码家电','图书教育','其他'
+    '生鲜果蔬','保健养生','数码家电','图书教育','其他',
+    '全品类'
   ];
   // ③ 带货类型 —— 平台给的固定枚举
   const CTYPES = ['直播为主','视频为主','视直一体','橱窗','种草'];
@@ -757,7 +761,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
   const ABNORMAL = '异常';
 
   // ③ 合作类型 —— 人工维护，与达人绑定（不是内容分类，是 BD 动作分类）
-  const COOPS = ['纯佣','投流'];
+  //   「纯佣+投流」= 同一达人有两种合作方式，需单独区分，不能塞进「纯佣」
+  const COOPS = ['纯佣','投流','纯佣+投流'];
   // ④ 达人标记 —— 贴在昵称后的彩色标记，3 选 1（空 = 无标记）
   //    只能设置、不能清除（与异常标一致，云端触发器保护）
   const MARKS = ['预算达人','稿费达人'];
@@ -2627,7 +2632,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     paste: parsePaste,
     normNick: normNickBase,
     sameCreator: findSameCreator,
-    merge: mergeIntoRow
+    merge: mergeIntoRow,
+    coop: guessCoop,
+    cate: guessCate,
+    track: guessTrack
   };
 
   // 无结果时的两个动作（事件委托，因为按钮是动态生成的）
@@ -3396,8 +3404,8 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     [/^(?:带货等级|等级|级别|lv|达人等级)$/, 'clevel'],
     [/^(?:带货类型|类型|直播类型|带货方式)$/, 'ctype'],
     [/^(?:达人赛道|赛道|达人类型)$/, 'track'],
-    [/^(?:带货分类|分类|品类)$/, 'cate'],
-    [/^(?:合作类型|合作方式|合作)$/, 'coop'],
+    [/^(?:带货分类|分类|品类|类目|带货品类|商品类目|主营类目)$/, 'cate'],
+    [/^(?:合作类型|合作方式|合作模式|合作形式|合作|模式|带货模式|佣金模式)$/, 'coop'],
     [/^(?:粉丝数?|粉丝|粉丝量|fans)$/, 'fans'],
     [/^(?:收货人|收件人|联系人)$/, 'receiver'],
     [/^(?:收货地址|地址|详细地址)$/, 'address'],
@@ -3444,6 +3452,63 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     return '';
   }
 
+  // 合作模式归一化：粘贴内容里「纯佣」常被打成「纯拥 / 纯用 / 纯银 / 纯佣金」等
+  //   能唯一确定的 → 归一化；同时兼容「投流 / 千川 / 付费」等说法
+  function guessCoop(s){
+    const t = String(s||'').trim().replace(/[\s\u3000]/g,'');
+    if (!t) return '';
+    // ⚠️ 「纯佣+投流」必须排在「纯佣」之前判，否则会被 ^纯佣 前缀规则抢先吃掉
+    if (/佣.*投|投.*佣|两种|都要|纯佣\+投流/.test(t)) return '纯佣+投流';
+    if (/^纯佣/.test(t) || /^佣/.test(t) || t === '纯拥' || t === '纯用' || t === '纯银' || t === '纯勇') return '纯佣';
+    if (/投流|千川|付费|付费流|投流合作/.test(t)) return '投流';
+    return '';
+  }
+
+  // 类目归一化：粘贴内容里的「全 / 全品类 / 全类目 / 不限 / 所有」→ 全品类
+  //   其他值若命中 CATES 枚举则原样保留
+  function guessCate(s){
+    const t = String(s||'').trim().replace(/[\s\u3000]/g,'');
+    if (!t) return '';
+    if (/^(?:全|全品类|全类目|全类|不限|所有|任何|通吃|all)$/i.test(t)) return '全品类';
+    // 常见简写映射
+    const MAP = {
+      '食品':'食品饮料','吃的':'食品饮料','美食':'食品饮料','饮料':'食品饮料',
+      '美妆':'美妆个护','个护':'美妆个护','护肤':'美妆个护',
+      '母婴':'母婴用品','宝妈':'母婴用品','亲子':'母婴用品',
+      '家居':'家居日用','日用':'家居日用','百货':'家居日用',
+      '服饰':'服饰鞋包','服装':'服饰鞋包','鞋包':'服饰鞋包',
+      '生鲜':'生鲜果蔬','果蔬':'生鲜果蔬','水果':'生鲜果蔬',
+      '保健':'保健养生','养生':'保健养生','健康':'保健养生',
+      '数码':'数码家电','家电':'数码家电','3c':'数码家电',
+      '图书':'图书教育','教育':'图书教育','书籍':'图书教育'
+    };
+    if (MAP[t]) return MAP[t];
+    if (CATES.indexOf(t) >= 0) return t;
+    return '';
+  }
+
+  // 赛道归一化（粘贴里可能出现，命中枚举则保留）
+  function guessTrack(s){
+    const t = String(s||'').trim().replace(/[\s\u3000]/g,'');
+    if (!t) return '';
+    const MAP = {
+      '美食':'美食吃播','吃播':'美食吃播','美食达人':'美食吃播',
+      '做菜':'厨房做菜','厨房':'厨房做菜','菜谱':'厨房做菜',
+      '美妆':'颜值美妆','颜值':'颜值美妆',
+      '健身':'运动健身','运动':'运动健身',
+      '知识':'知识技能','技能':'知识技能','科普':'知识技能',
+      'vlog':'生活Vlog','生活':'生活Vlog','日常':'生活Vlog',
+      '搞笑':'搞笑剧情','剧情':'搞笑剧情',
+      '宝妈':'宝妈亲子','亲子':'宝妈亲子','育儿':'宝妈亲子',
+      '游戏':'游戏音乐','音乐':'游戏音乐',
+      '三农':'三农特产','特产':'三农特产','农产品':'三农特产'
+    };
+    const low = t.toLowerCase();
+    if (MAP[low]) return MAP[low];
+    if (TRACKS.indexOf(t) >= 0) return t;
+    return '';
+  }
+
   // 昵称形态：含中文，或含 emoji / 特殊符号，长度 2–30
   const looksNick = s => {
     const t = String(s||'').trim();
@@ -3451,6 +3516,21 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     if (/^https?:/i.test(t)) return false;
     return /[\u4e00-\u9fa5]/.test(t) || /[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(t);
   };
+
+  // 裸值判据：严格白名单 —— 只有「整值」确实是个枚举词才认，避免把昵称吃掉
+  //   例：'纯佣'✓  '阿纯佣兵'✗（含额外字）  '食品'✓  '食品小张'✗
+  const COOP_WORDS = ['纯佣','纯拥','纯用','纯银','纯勇','投流','千川','付费','付费流','纯佣+投流','佣','投流合作'];
+  const CATE_WORDS = ['全','全品类','全类目','全类','不限','所有','任何','通吃',
+    '食品','吃的','美食','饮料','美妆','个护','护肤','母婴','宝妈','亲子','家居','日用','百货',
+    '服饰','服装','鞋包','生鲜','果蔬','水果','保健','养生','健康','数码','家电','3c',
+    '图书','教育','书籍','食品饮料','美妆个护','母婴用品','家居日用','服饰鞋包',
+    '生鲜果蔬','保健养生','数码家电','图书教育','其他'];
+  const TRACK_WORDS = ['美食','吃播','做菜','厨房','美妆','健身','运动','知识','技能','科普',
+    '生活','日常','搞笑','剧情','育儿','游戏','音乐','三农','特产','农产品'];
+
+  const isCoopWord  = s => COOP_WORDS.indexOf(String(s||'').trim()) >= 0;
+  const isCateWord  = s => CATE_WORDS.indexOf(String(s||'').trim()) >= 0;
+  const isTrackWord = s => TRACK_WORDS.indexOf(String(s||'').trim().toLowerCase()) >= 0;
 
   // ---------- 主解析函数 ----------
   //  返回：{ entries:[{nickname,wx1,wx2,wx3,phone,platform,handle,uid,clevel,ctype,track,cate,coop}], raw }
@@ -3477,7 +3557,15 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (key === 'nickname'){ o.nickname = o.nickname || val; return; }
       if (key === 'handle'){ o.handle = o.handle || val; return; }
       if (key === 'uid'){ o.uid = o.uid || val; return; }
-      if (key === 'track' || key === 'cate' || key === 'coop' || key === 'receiver' || key === 'address'){
+      if (key === 'track' || key === 'cate' || key === 'coop'){
+        // 枚举型字段：先归一化到合法枚举值；归一化不了则原样保留（不丢信息）
+        const g = key === 'coop' ? guessCoop(val)
+                : key === 'cate' ? guessCate(val)
+                : guessTrack(val);
+        o[key] = o[key] || g || val;
+        return;
+      }
+      if (key === 'receiver' || key === 'address'){
         o[key] = o[key] || val; return;
       }
       if (key === 'fans'){ const n = Number(val.replace(/[^\d.]/g,'')); if (!isNaN(n)) o.fans = o.fans || Math.round(n); return; }
@@ -3492,6 +3580,14 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       if (looksUid(val)){ o.uid = o.uid || val; return; }
       if (looksLv(val)){ o.clevel = o.clevel || ('L'+val.replace(/L/i,'')); return; }
       if (looksHandle(val)){ o.handle = o.handle || val; return; }
+      // 枚举型裸值识别 —— 必须放在 looksNick 之前，否则「纯佣」「食品」「全」会被当昵称吞掉
+      //   ⚠️ 判据要严格：只在「整值精确命中枚举/已知同义写法」时才算，避免误伤昵称
+      const gCoop = guessCoop(val);
+      if (gCoop && isCoopWord(val)){ o.coop = o.coop || gCoop; return; }
+      const gCate = guessCate(val);
+      if (gCate && isCateWord(val)){ o.cate = o.cate || gCate; return; }
+      const gTrack = guessTrack(val);
+      if (gTrack && isTrackWord(val)){ o.track = o.track || gTrack; return; }
       if (looksNick(val)){ o.nickname = o.nickname || val; return; }
       // 兜底：非空但认不出形态 → 当昵称（避免丢数据）
       o.nickname = o.nickname || val;
@@ -3703,7 +3799,7 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
     $('#pasteGo').disabled = false;
     let html = '<div class="impsep">解析结果（'+list.length+' 条）</div>';
     html += '<div class="impprev"><table><thead><tr>'+
-      '<th>平台</th><th>昵称</th><th>微信号</th><th>手机号</th><th>等级</th><th>处理方式</th>'+
+      '<th>平台</th><th>昵称</th><th>微信号</th><th>手机号</th><th>等级</th><th>类目</th><th>合作模式</th><th>处理方式</th>'+
     '</tr></thead><tbody>';
     list.forEach(e=>{
       const hit = findSameCreator(e.nickname, [e.wx1,e.wx2,e.wx3], e.phone);
@@ -3719,12 +3815,16 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
       }
       // 单条内多个微信号 → 提示
       const wxCol = wxs.length ? wxs.map(w=>esc(w)).join('　') : '<span style="color:var(--tx3)">未知</span>';
+      const cateCol = e.cate ? esc(e.cate) : '<span style="color:var(--tx3)">—</span>';
+      const coopCol = e.coop ? '<span class="coopbadge">'+esc(e.coop)+'</span>' : '<span style="color:var(--tx3)">—</span>';
       html += '<tr>'+
         '<td>'+esc(e.platform||'—')+'</td>'+
         '<td>'+esc(e.nickname||'—')+'</td>'+
         '<td style="font-size:11.5px">'+wxCol+'</td>'+
         '<td>'+esc(e.phone||'—')+'</td>'+
         '<td>'+esc(e.clevel||'—')+'</td>'+
+        '<td style="font-size:11.5px">'+cateCol+'</td>'+
+        '<td>'+coopCol+'</td>'+
         '<td>'+act+'</td>'+
       '</tr>';
     });
@@ -3758,6 +3858,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             if (String(hit[12]||'').trim()) patch.phone = hit[12];
             if (String(hit[0]||'').trim())  patch.platform = hit[0];
             if (String(hit[2]||'').trim())  patch.handle = hit[2];
+            // 枚举型增量列（赛道/类目/合作类型）—— 之前漏了，导致并入时这几列不同步到云端
+            if (String(hit[14]||'').trim()) patch.track = hit[14];
+            if (String(hit[15]||'').trim()) patch.cate  = hit[15];
+            if (String(hit[16]||'').trim()) patch.coop  = hit[16];
             if (Object.keys(patch).length){
               if (hit.__id != null){
                 await cbFetch('/'+CB.table+'?id=eq.'+encodeURIComponent(hit.__id), {method:'PATCH', body:patch});
@@ -3807,7 +3911,10 @@ window.__CHUNK__ = function (i, rows) { window.__CHUNKS__[i] = rows; };
             platform: row[0]||null, nickname: row[1]||'', handle: row[2]||null, uid: row[3]||null,
             ctype: row[5]||null, clevel: row[6]||null,
             wx1: row[8]||null, wx2: row[9]||null, wx3: row[10]||null,
-            phone: row[12]||null, editor:'2517', source:'paste'
+            phone: row[12]||null,
+            // 枚举型增量列 —— 之前漏了，导致新建时赛道/类目/合作类型没写进云端
+            track: row[14]||null, cate: row[15]||null, coop: row[16]||null,
+            editor:'2517', source:'paste'
           };
           try{
             const created = await cbFetch('/'+CB.table, {method:'POST', body});
